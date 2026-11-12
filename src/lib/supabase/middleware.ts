@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getDashboardPathForRole } from "@/lib/auth/session";
+import { getDashboardPathForRole } from "@/lib/auth/roles";
 import { UserRole } from "@/types/database";
 
 export async function updateSession(request: NextRequest) {
@@ -57,7 +57,6 @@ export async function updateSession(request: NextRequest) {
 
   // 2. If authenticated user accesses auth routes (login/register), redirect to their dashboard
   if (user && isAuthRoute) {
-    // Fetch user profile role
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
