@@ -1,12 +1,14 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { questions, questionBenchmarks, examinations, examinationQuestions, examinationAssignments } from "@/lib/db/schema";
 import { CreateQuestionInput, CreateExaminationInput } from "@/lib/validation/exam";
 import { requireRole } from "@/lib/auth/session";
+import { eq, desc, inArray } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
-export async function createQuestionAction(input: CreateQuestionInput) {
+export async function createQuestionAction(input: CreateQuestionInput & { benchmarkSeconds?: number }) {
   const profile = await requireRole(["TEACHER", "SUPER_ADMIN"]);
-  const supabase = await createClient();
 
   const options = [
     { id: "A", text: input.optionA },
@@ -15,115 +17,199 @@ export async function createQuestionAction(input: CreateQuestionInput) {
     { id: "D", text: input.optionD },
   ];
 
-  const { data, error } = await supabase
-    .from("questions")
-    .insert({
+  const [newQuestion] = await db
+    .insert(questions)
+    .values({
       category: input.category,
-      subject_id: input.subjectId,
+      subjectId: input.subjectId,
       topic: input.topic,
       difficulty: input.difficulty,
-      q_type: "SINGLE_CORRECT_MCQ",
-      question_text: input.questionText,
-      image_url: input.imageUrl || null,
+      qType: "SINGLE_CORRECT_MCQ",
+      questionText: input.questionText,
+      imageUrl: input.imageUrl || null,
       options,
-      correct_answer: input.correctAnswer,
+      correctAnswer: input.correctAnswer,
       explanation: input.explanation || null,
-      default_marks: input.defaultMarks,
-      default_negative_marks: input.defaultNegativeMarks,
-      is_published: input.isPublished,
-      created_by: profile.id,
+      defaultMarks: input.defaultMarks.toString(),
+      defaultNegativeMarks: input.defaultNegativeMarks.toString(),
+      isPublished: input.isPublished ?? true,
+      createdBy: profile.id,
     })
-    .select()
-    .single();
+    .returning();
 
-  if (error) {
-    throw new Error(`Failed to create question: ${error.message}`);
+  // Create benchmark duration if provided
+  const benchmarkSec = input.benchmarkSeconds || (input.difficulty === "HARD" ? 180 : input.difficulty === "MEDIUM" ? 120 : 60);
+  await db
+    .insert(questionBenchmarks)
+    .values({
+      questionId: newQuestion.id,
+      expectedTimeSeconds: benchmarkSec,
+      topperTimeSeconds: Math.round(benchmarkSec / 2),
+      difficultyRating: input.difficulty,
+    })
+    .onConflictDoNothing();
+
+  revalidatePath("/teacher/questions");
+  revalidatePath("/admin/question-bank");
+
+  return newQuestion;
+}
+
+export async function updateQuestionAction(
+  questionId: string,
+  input: {
+    category: any;
+    subjectId: string;
+    topic: string;
+    difficulty: any;
+    questionText: string;
+    imageUrl?: string | null;
+    optionA: string;
+    optionB: string;
+    optionC: string;
+    optionD: string;
+    correctAnswer: any;
+    explanation?: string | null;
+    defaultMarks: number;
+    defaultNegativeMarks: number;
+    benchmarkSeconds?: number;
+    isPublished?: boolean;
+  }
+) {
+  const profile = await requireRole(["TEACHER", "SUPER_ADMIN"]);
+
+  // Teacher can update question if they created it or if they are SUPER_ADMIN
+  const [existing] = await db
+    .select()
+    .from(questions)
+    .where(eq(questions.id, questionId))
+    .limit(1);
+
+  if (!existing) {
+    throw new Error("Question not found.");
   }
 
-  return data;
+  if (profile.role === "TEACHER" && existing.createdBy !== profile.id) {
+    throw new Error("You are not authorized to edit this question.");
+  }
+
+  const options = [
+    { id: "A", text: input.optionA },
+    { id: "B", text: input.optionB },
+    { id: "C", text: input.optionC },
+    { id: "D", text: input.optionD },
+  ];
+
+  await db
+    .update(questions)
+    .set({
+      category: input.category,
+      subjectId: input.subjectId,
+      topic: input.topic,
+      difficulty: input.difficulty,
+      questionText: input.questionText,
+      imageUrl: input.imageUrl || null,
+      options,
+      correctAnswer: input.correctAnswer,
+      explanation: input.explanation || null,
+      defaultMarks: input.defaultMarks.toString(),
+      defaultNegativeMarks: input.defaultNegativeMarks.toString(),
+      isPublished: input.isPublished ?? existing.isPublished,
+      updatedAt: new Date(),
+    })
+    .where(eq(questions.id, questionId));
+
+  // Also update benchmark if present
+  if (input.benchmarkSeconds) {
+    await db
+      .insert(questionBenchmarks)
+      .values({
+        questionId,
+        expectedTimeSeconds: input.benchmarkSeconds,
+        topperTimeSeconds: Math.round(input.benchmarkSeconds / 2),
+        difficultyRating: input.difficulty,
+      })
+      .onConflictDoUpdate({
+        target: questionBenchmarks.questionId,
+        set: {
+          expectedTimeSeconds: input.benchmarkSeconds,
+          difficultyRating: input.difficulty,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  revalidatePath("/teacher/questions");
+  revalidatePath("/admin/question-bank");
+
+  return { success: true };
 }
 
 export async function createExaminationAction(input: CreateExaminationInput) {
   const profile = await requireRole(["TEACHER", "SUPER_ADMIN"]);
-  const supabase = await createClient();
 
   // 1. Fetch questions to calculate total marks and create immutable snapshots
-  const { data: questions, error: qError } = await supabase
-    .from("questions")
-    .select("*")
-    .in("id", input.questionIds);
+  const questionsList = await db
+    .select()
+    .from(questions)
+    .where(inArray(questions.id, input.questionIds));
 
-  if (qError || !questions || questions.length !== input.questionIds.length) {
+  if (!questionsList || questionsList.length !== input.questionIds.length) {
     throw new Error("One or more selected questions could not be found.");
   }
 
-  const totalMarks = questions.reduce(
-    (sum, q) => sum + Number(q.default_marks || 4),
+  const totalMarks = questionsList.reduce(
+    (sum, q) => sum + Number(q.defaultMarks || 4),
     0
   );
 
   // 2. Insert examination master
-  const { data: exam, error: examError } = await supabase
-    .from("examinations")
-    .insert({
+  const [exam] = await db
+    .insert(examinations)
+    .values({
       title: input.title,
       description: input.description || null,
       category: input.category,
-      duration_minutes: input.durationMinutes,
-      total_marks: totalMarks,
-      start_window: input.startWindow,
-      end_window: input.endWindow,
-      max_attempts: input.maxAttempts,
-      result_release_policy: input.resultReleasePolicy,
-      is_published: input.isPublished,
-      created_by: profile.id,
+      durationMinutes: input.durationMinutes,
+      totalMarks: totalMarks.toString(),
+      startWindow: new Date(input.startWindow),
+      endWindow: new Date(input.endWindow),
+      maxAttempts: input.maxAttempts,
+      resultReleasePolicy: input.resultReleasePolicy,
+      isPublished: input.isPublished,
+      createdBy: profile.id,
     })
-    .select()
-    .single();
+    .returning();
 
-  if (examError || !exam) {
-    throw new Error(`Failed to create examination: ${examError?.message}`);
+  // 3. Create immutable snapshots in examination_questions
+  for (let idx = 0; idx < questionsList.length; idx++) {
+    const q = questionsList[idx];
+    await db.insert(examinationQuestions).values({
+      examinationId: exam.id,
+      questionId: q.id,
+      questionOrder: idx + 1,
+      marks: q.defaultMarks,
+      negativeMarks: q.defaultNegativeMarks,
+      snapshotText: q.questionText,
+      snapshotOptions: q.options,
+      snapshotImageUrl: q.imageUrl,
+      snapshotCorrectAnswer: q.correctAnswer,
+      snapshotExplanation: q.explanation,
+      snapshotBenchmarkSeconds: 60,
+    });
   }
 
-  // 3. Insert immutable question snapshots into examination_questions
-  const examQuestionRows = input.questionIds.map((qId, index) => {
-    const q = questions.find((item) => item.id === qId)!;
-    return {
-      examination_id: exam.id,
-      question_id: q.id,
-      question_order: index + 1,
-      marks: q.default_marks,
-      negative_marks: q.default_negative_marks,
-      snapshot_text: q.question_text,
-      snapshot_options: q.options,
-      snapshot_image_url: q.image_url,
-      snapshot_correct_answer: q.correct_answer,
-      snapshot_explanation: q.explanation,
-    };
-  });
-
-  const { error: mappingError } = await supabase
-    .from("examination_questions")
-    .insert(examQuestionRows);
-
-  if (mappingError) {
-    throw new Error(`Failed to map questions to examination: ${mappingError.message}`);
+  // 4. Assign examination to selected batches
+  for (const batchId of input.batchIds) {
+    await db.insert(examinationAssignments).values({
+      examinationId: exam.id,
+      batchId,
+      assignedBy: profile.id,
+    });
   }
 
-  // 4. Assign examination to batches
-  const assignmentRows = input.batchIds.map((batchId) => ({
-    examination_id: exam.id,
-    batch_id: batchId,
-    assigned_by: profile.id,
-  }));
-
-  const { error: assignError } = await supabase
-    .from("examination_assignments")
-    .insert(assignmentRows);
-
-  if (assignError) {
-    throw new Error(`Failed to assign examination to batches: ${assignError.message}`);
-  }
+  revalidatePath("/teacher/examinations");
+  revalidatePath("/admin/examinations");
 
   return exam;
 }
