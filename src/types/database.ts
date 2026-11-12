@@ -1,5 +1,5 @@
 export type UserRole = "SUPER_ADMIN" | "TEACHER" | "PARENT" | "STUDENT";
-export type ExamTarget = "JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "FOUNDATION";
+export type ExamTarget = "JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "FOUNDATION" | "DEMO";
 export type QuestionDifficulty = "EASY" | "MEDIUM" | "HARD";
 export type QuestionType = "SINGLE_CORRECT_MCQ" | "NUMERICAL" | "MULTIPLE_CORRECT";
 export type ExamResultPolicy = "IMMEDIATE" | "AFTER_DEADLINE" | "MANUAL";

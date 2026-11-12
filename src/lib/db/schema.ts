@@ -26,6 +26,7 @@ export const examTargetEnum = pgEnum("exam_target", [
   "JEE_ADVANCED",
   "NEET",
   "FOUNDATION",
+  "DEMO",
 ]);
 
 export const relationshipKindEnum = pgEnum("relationship_kind", [

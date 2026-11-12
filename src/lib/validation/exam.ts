@@ -6,7 +6,7 @@ export const QuestionOptionSchema = z.object({
 });
 
 export const CreateQuestionSchema = z.object({
-  category: z.enum(["JEE_MAIN", "JEE_ADVANCED", "NEET", "FOUNDATION"]).default("JEE_MAIN"),
+  category: z.enum(["JEE_MAIN", "JEE_ADVANCED", "NEET", "FOUNDATION", "DEMO"]).default("JEE_MAIN"),
   subjectId: z.string().uuid("Invalid subject ID"),
   topic: z.string().min(2, "Topic must be at least 2 characters"),
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]).default("MEDIUM"),
@@ -26,7 +26,7 @@ export const CreateQuestionSchema = z.object({
 export const CreateExaminationSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(200),
   description: z.string().optional().or(z.literal("")),
-  category: z.enum(["JEE_MAIN", "JEE_ADVANCED", "NEET", "FOUNDATION"]).default("JEE_MAIN"),
+  category: z.enum(["JEE_MAIN", "JEE_ADVANCED", "NEET", "FOUNDATION", "DEMO"]).default("JEE_MAIN"),
   durationMinutes: z.coerce.number().int().min(5, "Duration must be at least 5 minutes").max(360),
   startWindow: z.string().min(1, "Start window is required"),
   endWindow: z.string().min(1, "End window is required"),

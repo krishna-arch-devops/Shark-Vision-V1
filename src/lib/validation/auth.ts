@@ -22,7 +22,7 @@ export const StudentRegisterSchema = z.object({
     .regex(/^[6-9]\d{9}$/, "Please enter a valid 10-digit Indian phone number")
     .optional()
     .or(z.literal("")),
-  targetExam: z.enum(["JEE_MAIN", "JEE_ADVANCED", "NEET", "FOUNDATION"]).default("JEE_MAIN"),
+  targetExam: z.enum(["JEE_MAIN", "JEE_ADVANCED", "NEET", "FOUNDATION", "DEMO"]).default("JEE_MAIN"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
