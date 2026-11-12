@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: sharkvision_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sharkvision}
+      POSTGRES_USER: ${POSTGRES_USER:-sharkvision}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sharkvision_local_secret}
+    ports:
+      # If port 5432 is already bound by host PostgreSQL, port 5433 can be used
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - sharkvision_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sharkvision} -d ${POSTGRES_DB:-sharkvision}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sharkvision_postgres_data:
+    name: sharkvision_postgres_data
