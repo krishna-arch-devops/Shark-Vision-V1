@@ -1,0 +1,30 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 154586926909.dkr.ecr.us-east-1.amazonaws.com
+      - REPOSITORY_URI=154586926909.dkr.ecr.us-east-1.amazonaws.com/sharkvision
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:-latest}
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Installing dependencies...
+      - npm ci --legacy-peer-deps
+      - echo Building Next.js application...
+      - npm run build
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest -t $REPOSITORY_URI:6904c48 -t $REPOSITORY_URI:$IMAGE_TAG .
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:6904c48
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - printf '[{"name":"sharkvision-web","imageUri":"%s"}]' $REPOSITORY_URI:6904c48 > imagedefinitions.json
+artifacts:
+  files: imagedefinitions.json

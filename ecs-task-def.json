@@ -1,0 +1,62 @@
+{
+  "family": "sharkvision",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::154586926909:role/aws-apn-staging-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::154586926909:role/aws-apn-staging-backend-task-role",
+  "containerDefinitions": [
+    {
+      "name": "sharkvision-web",
+      "image": "154586926909.dkr.ecr.us-east-1.amazonaws.com/sharkvision:6904c48",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "hostPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "3000" },
+        { "name": "HOSTNAME", "value": "0.0.0.0" },
+        { "name": "NEXT_PUBLIC_APP_NAME", "value": "SHARKVISION" }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:154586926909:secret:sharkvision/production/config-1KCHNu:DATABASE_URL::"
+        },
+        {
+          "name": "APP_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:154586926909:secret:sharkvision/production/config-1KCHNu:APP_SECRET::"
+        },
+        {
+          "name": "NEXT_PUBLIC_COGNITO_USER_POOL_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:154586926909:secret:sharkvision/production/config-1KCHNu:COGNITO_USER_POOL_ID::"
+        },
+        {
+          "name": "NEXT_PUBLIC_COGNITO_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:154586926909:secret:sharkvision/production/config-1KCHNu:COGNITO_CLIENT_ID::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sharkvision",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "web"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"],
+        "interval": 15,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 20
+      }
+    }
+  ]
+}
