@@ -16,6 +16,9 @@ export const pool =
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
+    ssl: connectionString.includes("rds.amazonaws.com") || connectionString.includes("sslmode=no-verify")
+      ? { rejectUnauthorized: false }
+      : undefined,
   });
 
 if (process.env.NODE_ENV !== "production") {
