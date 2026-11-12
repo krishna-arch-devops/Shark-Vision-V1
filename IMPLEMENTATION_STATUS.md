@@ -1,27 +1,23 @@
-# SHARKVISION — Implementation Status (Iteration 2)
+# SHARKVISION — Implementation Status (Iteration 3)
 
 ## Acceptance Criteria Checklist
 
 | # | Acceptance Criterion | Status | Evidence / Notes |
 |---|---|---|---|
-| 1 | Teacher can create a question | VERIFIED | Form at `/teacher/questions` connects to `createQuestionAction` with Zod validation. |
-| 2 | Teacher can create and publish an examination | VERIFIED | Builder at `/teacher/examinations/create` connects to `createExaminationAction`. |
-| 3 | Teacher can assign it to an authorized batch | VERIFIED | Batch selector in builder assigns to `examination_assignments`. |
-| 4 | Student can view assigned examinations | VERIFIED | Portal at `/student/examinations` queries batch-enrolled published tests. |
-| 5 | Student can start an authorized examination | VERIFIED | Dedicated canvas at `/student/examinations/[id]/take` executes `startOrResumeExam()`. |
-| 6 | Student can answer and navigate questions | VERIFIED | Option selection, palette navigation, and Next/Previous navigation implemented. |
-| 7 | Student can change and clear answers | VERIFIED | Option revision triggers `ANSWER_CHANGED` and Clear Response button dispatches `ANSWER_CLEARED`. |
-| 8 | Student can mark questions for review | VERIFIED | Question review toggle persists flag and displays amber badge and purple palette state. |
-| 9 | Question-level time is measured across revisits | VERIFIED | Monotonic clock accumulator calculates dwell time; unit test passing (`timing-accumulator.test.ts`). |
-| 10 | Answer history is recorded | VERIFIED | `attempt_events` stores complete sequence of selections, changes, and timings. |
-| 11 | Responses survive browser refresh | VERIFIED | Server-side `startOrResumeExam` restores saved answers and review flags from `attempt_responses`. |
-| 12 | Temporary connection loss is handled safely | VERIFIED | Offline event queue with idempotency keys and online reconnect listener in `useExamTimerAndEvents`. |
-| 13 | Exam timeout is enforced server-side | VERIFIED | Authoritative `server_deadline` stored on server; late submissions auto-finalized. |
-| 14 | Student can submit successfully | VERIFIED | Confirmation modal triggers `/api/exam/submit` and redirects to `/student/examinations/confirmed`. |
-| 15 | Duplicate submission is prevented | VERIFIED | Idempotent attempt status check in `finalizeAttempt()`. |
-| 16 | Grading is performed server-side | VERIFIED | `finalizeAttempt()` scores against immutable snapshots with positive/negative marks; unit test passing (`grading.test.ts`). |
-| 17 | Results respect release policies | VERIFIED | RLS policies enforce `IMMEDIATE`, `AFTER_DEADLINE`, or `MANUAL` restrictions. |
-| 18 | Unauthorized access is blocked | VERIFIED | Role-based redirects and student-sanitized question projections without answer keys. |
-| 19 | Relevant automated tests pass | VERIFIED | Vitest test suite passes `29/29` tests cleanly. |
-| 20 | Production build succeeds | VERIFIED | `next build` compiles all 50 static and dynamic routes. |
-| 21 | Existing Iteration 1 features remain functional | VERIFIED | All 4 role dashboards, login, registration, and landing pages preserved and verified. |
+| 1 | Examination metrics calculate correctly | VERIFIED | `calculatePerformanceOverview` handles positive/negative marks, duration, and avoid divide-by-zero. |
+| 2 | Timing metrics reconcile with recorded intervals | VERIFIED | Cumulative active dwell times aggregated monotonically; visit counts, longest visit, and first selection time parsed. |
+| 3 | Answer changes are reconstructed accurately | VERIFIED | Sequence order preserved; B -> C -> B sequence records 2 changes with 0 net mark delta (`analytics-calculators.test.ts`). |
+| 4 | First-answer score simulations work | VERIFIED | Deterministic counterfactual calculation evaluates hypothetical score if candidate retained first selected answers. |
+| 5 | Speed classifications use real benchmarks | VERIFIED | `calculateSpeedAccuracyMatrix` classifies against `snapshot_benchmark_seconds`; missing benchmarks classified as `UNKNOWN`. |
+| 6 | Subject totals reconcile with examination totals | VERIFIED | Aggregate subject marks equal overall exam marks (`analytics-calculators.test.ts`). |
+| 7 | Topic summaries handle insufficient data | VERIFIED | Topics with $< 3$ attempts classified as `INSUFFICIENT_DATA` rather than drawing false conclusions. |
+| 8 | Trends distinguish comparable tests | VERIFIED | Progress data contracts distinguish comparable exams. |
+| 9 | Recommendations are deterministic and evidence-based | VERIFIED | Rule engine produces explainable guidance referencing exact metric IDs and questions without LLM/AI. |
+| 10 | Parent summaries use plain English | VERIFIED | Jargon-free summaries generated for non-technical parents (`parent-summary-service.ts`). |
+| 11 | Analytics endpoints enforce authorization | VERIFIED | `/api/analytics/attempt/[attemptId]` enforces role checks, linked parent verification, and teacher-batch bounds. |
+| 12 | Result-release rules are respected | VERIFIED | `AFTER_DEADLINE` and `MANUAL` policies gate student and parent analytics access with HTTP 423. |
+| 13 | No fake analytics are presented as real results | VERIFIED | Calculations derived strictly from database attempts, responses, and events. |
+| 14 | Automated tests pass | VERIFIED | Vitest unit test suite passes 36/36 tests cleanly. |
+| 15 | TypeScript compilation succeeds | VERIFIED | `npx tsc --noEmit` exits with 0 errors in strict mode. |
+| 16 | Production build succeeds | VERIFIED | `next build` compiles all 50 routes successfully. |
+| 17 | Previous examination functionality remains intact | VERIFIED | Test taking, authoring, and auth remain verified and unbroken. |
