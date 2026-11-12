@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
-import { createClient } from "@/lib/supabase/server";
 import { AnalyticsService } from "@/features/analytics/services/analytics-service";
 import { StudentExamResultsHub } from "@/components/dashboard/student-exam-results-hub";
+import { db } from "@/lib/db";
+import { examinationAttempts, examinations } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 interface StudentExamResultsPageProps {
   params: Promise<{ attemptId: string }>;
@@ -18,27 +20,32 @@ export default async function StudentExamResultsPage({
     redirect(`/login?redirect=/student/exams/${attemptId}/results`);
   }
 
-  const supabase = await createClient();
+  // 1. Fetch attempt and exam master from native PostgreSQL
+  const [attemptData] = await db
+    .select({
+      studentId: examinationAttempts.studentId,
+      examTitle: examinations.title,
+      examCategory: examinations.category,
+      resultReleasePolicy: examinations.resultReleasePolicy,
+      endWindow: examinations.endWindow,
+    })
+    .from(examinationAttempts)
+    .innerJoin(examinations, eq(examinationAttempts.examinationId, examinations.id))
+    .where(eq(examinationAttempts.id, attemptId))
+    .limit(1);
 
-  // 1. Fetch attempt and exam master
-  const { data: attempt, error: aErr } = await supabase
-    .from("examination_attempts")
-    .select("student_id, examinations!inner(title, category, result_release_policy, end_window)")
-    .eq("id", attemptId)
-    .single();
-
-  if (aErr || !attempt) {
+  if (!attemptData) {
     redirect("/student/examinations");
   }
 
   // 2. Validate Student Ownership (or elevated Super Admin)
-  if (profile.role === "STUDENT" && attempt.student_id !== profile.id) {
+  if (profile.role === "STUDENT" && attemptData.studentId !== profile.id) {
     redirect("/student");
   }
 
   // 3. Validate Result Release Policy
-  const policy = (attempt.examinations as any).result_release_policy;
-  const endWindow = new Date((attempt.examinations as any).end_window);
+  const policy = attemptData.resultReleasePolicy;
+  const endWindow = new Date(attemptData.endWindow);
 
   if (profile.role === "STUDENT") {
     if (policy === "AFTER_DEADLINE" && new Date() < endWindow) {
@@ -64,15 +71,15 @@ export default async function StudentExamResultsPage({
     }
   }
 
-  // 4. Compute or load analytics snapshot
+  // 4. Compute or load analytics snapshot via native PostgreSQL
   const analyticsService = new AnalyticsService();
   const analytics = await analyticsService.getOrComputeAttemptAnalytics(attemptId);
 
   return (
     <StudentExamResultsHub
       analytics={analytics}
-      examTitle={(attempt.examinations as any).title}
-      examCategory={(attempt.examinations as any).category}
+      examTitle={attemptData.examTitle}
+      examCategory={attemptData.examCategory}
     />
   );
 }

@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
-import { createClient } from "@/lib/supabase/server";
 import { AnalyticsService } from "@/features/analytics/services/analytics-service";
 import { InteractiveMarksSimulator } from "@/components/intelligence/interactive-marks-simulator";
+import { db } from "@/lib/db";
+import { examinationAttempts, examinations } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 interface SimulatorPageProps {
   params: Promise<{ attemptId: string }>;
@@ -16,27 +18,31 @@ export default async function MarksSimulatorPage({ params }: SimulatorPageProps)
     redirect(`/login?redirect=/student/exams/${attemptId}/simulator`);
   }
 
-  const supabase = await createClient();
+  // 1. Fetch attempt and exam master from native PostgreSQL
+  const [attempt] = await db
+    .select({
+      studentId: examinationAttempts.studentId,
+      examTitle: examinations.title,
+      resultReleasePolicy: examinations.resultReleasePolicy,
+      endWindow: examinations.endWindow,
+    })
+    .from(examinationAttempts)
+    .innerJoin(examinations, eq(examinationAttempts.examinationId, examinations.id))
+    .where(eq(examinationAttempts.id, attemptId))
+    .limit(1);
 
-  // 1. Fetch attempt and exam master
-  const { data: attempt, error: aErr } = await supabase
-    .from("examination_attempts")
-    .select("student_id, examinations!inner(title, result_release_policy, end_window)")
-    .eq("id", attemptId)
-    .single();
-
-  if (aErr || !attempt) {
+  if (!attempt) {
     redirect("/student/examinations");
   }
 
   // 2. Validate Student Ownership
-  if (profile.role === "STUDENT" && attempt.student_id !== profile.id) {
+  if (profile.role === "STUDENT" && attempt.studentId !== profile.id) {
     redirect("/student");
   }
 
   // 3. Verify results are released
-  const policy = (attempt.examinations as any).result_release_policy;
-  const endWindow = new Date((attempt.examinations as any).end_window);
+  const policy = attempt.resultReleasePolicy;
+  const endWindow = new Date(attempt.endWindow);
   if (profile.role === "STUDENT") {
     if (policy === "AFTER_DEADLINE" && new Date() < endWindow) {
       redirect(`/student/exams/${attemptId}/results`);
@@ -48,8 +54,8 @@ export default async function MarksSimulatorPage({ params }: SimulatorPageProps)
 
   return (
     <InteractiveMarksSimulator
+      examTitle={attempt.examTitle}
       analytics={analytics}
-      examTitle={(attempt.examinations as any).title}
     />
   );
 }
