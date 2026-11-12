@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { pool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +21,14 @@ export async function GET(req: NextRequest) {
   };
 
   try {
-    const supabase = await createClient();
-    // Lightweight probe
-    const { data, error } = await supabase.from("profiles").select("id").limit(1);
-    if (!error) {
-      checks.database = "ok";
+    const client = await pool.connect();
+    try {
+      const res = await client.query("SELECT 1;");
+      if (res.rowCount === 1) {
+        checks.database = "ok";
+      }
+    } finally {
+      client.release();
     }
   } catch (err) {
     logger.warn("Database health probe non-fatal exception", { error: err });
