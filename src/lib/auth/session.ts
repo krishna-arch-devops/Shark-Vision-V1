@@ -1,36 +1,38 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/local-auth";
 import { Profile, UserRole } from "@/types/database";
+import { db } from "@/lib/db";
+import { profiles } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function getCurrentUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return null;
-  }
-
-  return user;
+  const session = await getSession();
+  if (!session) return null;
+  return { id: session.userId, email: session.email };
 }
 
 export async function getCurrentProfile(): Promise<Profile | null> {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const session = await getSession();
+  if (!session) return null;
 
-  const supabase = await createClient();
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const [userProfile] = await db
+    .select()
+    .from(profiles)
+    .where(eq(profiles.id, session.userId))
+    .limit(1);
 
-  if (error || !profile) {
-    return null;
-  }
+  if (!userProfile) return null;
 
-  return profile as Profile;
+  return {
+    id: userProfile.id,
+    email: userProfile.email,
+    role: userProfile.role as UserRole,
+    full_name: userProfile.fullName,
+    phone_number: userProfile.phoneNumber,
+    avatar_url: userProfile.avatarUrl,
+    is_active: userProfile.isActive,
+    created_at: userProfile.createdAt.toISOString(),
+    updated_at: userProfile.updatedAt.toISOString(),
+  };
 }
 
 export async function requireAuth(): Promise<Profile> {
@@ -49,17 +51,4 @@ export async function requireRole(allowedRoles: UserRole[]): Promise<Profile> {
   return profile;
 }
 
-export function getDashboardPathForRole(role: UserRole): string {
-  switch (role) {
-    case "SUPER_ADMIN":
-      return "/admin";
-    case "TEACHER":
-      return "/teacher";
-    case "PARENT":
-      return "/parent";
-    case "STUDENT":
-      return "/student";
-    default:
-      return "/student";
-  }
-}
+export { getDashboardPathForRole } from "@/lib/auth/roles";

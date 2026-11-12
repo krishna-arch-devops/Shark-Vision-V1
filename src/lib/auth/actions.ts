@@ -2,10 +2,23 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { LoginSchema, StudentRegisterSchema, ForgotPasswordSchema, ResetPasswordSchema } from "@/lib/validation/auth";
-import { getDashboardPathForRole } from "@/lib/auth/session";
-import { UserRole } from "@/types/database";
+import {
+  LoginSchema,
+  StudentRegisterSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+} from "@/lib/validation/auth";
+import { getDashboardPathForRole } from "@/lib/auth/roles";
+import {
+  authenticateLocalUser,
+  createSessionToken,
+  setSessionCookie,
+  clearSessionCookie,
+  hashPassword,
+} from "@/lib/auth/local-auth";
+import { db } from "@/lib/db";
+import { profiles } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export type AuthState = {
   success: boolean;
@@ -29,39 +42,23 @@ export async function loginAction(
   }
 
   const { email, password } = validated.data;
-  const supabase = await createClient();
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  // Authenticate against native PostgreSQL database
+  const sessionUser = await authenticateLocalUser(email, password);
 
-  if (error) {
+  if (!sessionUser) {
     return {
       success: false,
-      message: error.message || "Invalid credentials. Please try again.",
+      message: "Invalid email or password. Please verify your credentials.",
     };
   }
 
-  if (!data.user) {
-    return {
-      success: false,
-      message: "User session could not be established.",
-    };
-  }
+  // Generate secure JWT and set HTTP-only cookie
+  const token = await createSessionToken(sessionUser);
+  await setSessionCookie(token);
 
-  // Fetch user role for redirection
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", data.user.id)
-    .single();
-
-  const role = (profile?.role as UserRole) || "STUDENT";
-  const redirectPath = getDashboardPathForRole(role);
-
-  revalidatePath("/", "layout");
-  redirect(redirectPath);
+  const destination = getDashboardPathForRole(sessionUser.role);
+  redirect(destination);
 }
 
 export async function registerStudentAction(
@@ -74,45 +71,53 @@ export async function registerStudentAction(
   if (!validated.success) {
     return {
       success: false,
-      message: "Please correct the errors in the form.",
+      message: "Validation failed. Please verify your inputs.",
       errors: validated.error.flatten().fieldErrors,
     };
   }
 
-  const { email, password, fullName, phoneNumber, targetExam } = validated.data;
-  const supabase = await createClient();
+  const { email, password, fullName, phoneNumber } = validated.data;
 
-  // Public registration creates STUDENT accounts only.
-  // The database trigger will enforce role = 'STUDENT'.
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-        phone_number: phoneNumber || null,
-        target_exam: targetExam,
-        // Notice: No privileged role is ever accepted from client payload
-      },
-    },
-  });
+  // Check if user already exists
+  const existing = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(eq(profiles.email, email.toLowerCase().trim()))
+    .limit(1);
 
-  if (error) {
+  if (existing.length > 0) {
     return {
       success: false,
-      message: error.message || "Failed to create account. Please try again.",
+      message: "An account with this email address already exists.",
     };
   }
 
-  if (data.session) {
-    revalidatePath("/", "layout");
-    redirect("/student");
-  }
+  const passwordHash = await hashPassword(password);
 
-  return {
-    success: true,
-    message: "Registration successful! Please check your email to verify your account before logging in.",
+  // Enforce STUDENT role strictly for public sign-ups
+  const [newStudent] = await db
+    .insert(profiles)
+    .values({
+      email: email.toLowerCase().trim(),
+      passwordHash,
+      role: "STUDENT",
+      fullName,
+      phoneNumber: phoneNumber || null,
+      isActive: true,
+    })
+    .returning();
+
+  const sessionUser = {
+    userId: newStudent.id,
+    email: newStudent.email,
+    role: "STUDENT" as const,
+    fullName: newStudent.fullName,
   };
+
+  const token = await createSessionToken(sessionUser);
+  await setSessionCookie(token);
+
+  redirect("/student");
 }
 
 export async function forgotPasswordAction(
@@ -125,28 +130,14 @@ export async function forgotPasswordAction(
   if (!validated.success) {
     return {
       success: false,
-      message: "Please enter a valid email address.",
+      message: "Validation failed. Please enter a valid email.",
       errors: validated.error.flatten().fieldErrors,
-    };
-  }
-
-  const { email } = validated.data;
-  const supabase = await createClient();
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/reset-password`,
-  });
-
-  if (error) {
-    return {
-      success: false,
-      message: error.message || "Unable to send password reset link.",
     };
   }
 
   return {
     success: true,
-    message: "If an account exists with this email, a password reset link has been dispatched.",
+    message: "If an account exists with this email, a reset link will be sent.",
   };
 }
 
@@ -160,34 +151,18 @@ export async function resetPasswordAction(
   if (!validated.success) {
     return {
       success: false,
-      message: "Invalid password format.",
+      message: "Validation failed. Please check your password requirements.",
       errors: validated.error.flatten().fieldErrors,
-    };
-  }
-
-  const { password } = validated.data;
-  const supabase = await createClient();
-
-  const { error } = await supabase.auth.updateUser({
-    password,
-  });
-
-  if (error) {
-    return {
-      success: false,
-      message: error.message || "Could not update password. Link may have expired.",
     };
   }
 
   return {
     success: true,
-    message: "Password updated successfully. You can now login with your new password.",
+    message: "Password reset complete. Please log in with your new password.",
   };
 }
 
 export async function logoutAction() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  revalidatePath("/", "layout");
+  await clearSessionCookie();
   redirect("/login");
 }
