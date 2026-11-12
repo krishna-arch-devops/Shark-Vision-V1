@@ -67,6 +67,21 @@ export const attemptStatusEnum = pgEnum("attempt_status", [
 ]);
 
 export const eventTypeEnum = pgEnum("event_type", [
+  "EXAM_STARTED",
+  "QUESTION_OPENED",
+  "QUESTION_LEFT",
+  "ANSWER_SELECTED",
+  "ANSWER_CHANGED",
+  "ANSWER_CLEARED",
+  "QUESTION_MARKED_FOR_REVIEW",
+  "QUESTION_UNMARKED_FOR_REVIEW",
+  "QUESTION_REVISITED",
+  "TAB_HIDDEN",
+  "TAB_VISIBLE",
+  "EXAM_PAUSED_BY_SYSTEM",
+  "EXAM_RESUMED",
+  "EXAM_SUBMITTED",
+  "EXAM_AUTO_SUBMITTED",
   "QUESTION_VIEWED",
   "OPTION_SELECTED",
   "OPTION_CLEARED",

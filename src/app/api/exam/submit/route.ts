@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/local-auth";
 import { finalizeAttempt } from "@/lib/exam/engine";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { db } from "@/lib/db";
+import { examinationAttempts } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getSession();
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Rate limit finalize attempts: 5 per minute per user
-    const rl = checkRateLimit(`submit_${user.id}`, { windowMs: 60 * 1000, maxRequests: 5 });
+    const rl = checkRateLimit(`submit_${session.userId}`, { windowMs: 60 * 1000, maxRequests: 5 });
     if (!rl.allowed) {
-      logger.warn("Rate limit exceeded on exam submit", { userId: user.id });
+      logger.warn("Rate limit exceeded on exam submit", { userId: session.userId });
       return NextResponse.json(
         { error: "Too many submission attempts. Please wait." },
         { status: 429, headers: { "Retry-After": String(Math.ceil(rl.resetMs / 1000)) } }
@@ -31,15 +30,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Valid Attempt ID is required" }, { status: 400 });
     }
 
-    // Verify ownership and status
-    const { data: attempt, error: aErr } = await supabase
-      .from("examination_attempts")
-      .select("id, student_id, status")
-      .eq("id", attemptId)
-      .eq("student_id", user.id)
-      .single();
+    // Verify ownership and status in native PostgreSQL
+    const [attempt] = await db
+      .select({
+        id: examinationAttempts.id,
+        studentId: examinationAttempts.studentId,
+        status: examinationAttempts.status,
+      })
+      .from(examinationAttempts)
+      .where(
+        and(
+          eq(examinationAttempts.id, attemptId),
+          eq(examinationAttempts.studentId, session.userId)
+        )
+      )
+      .limit(1);
 
-    if (aErr || !attempt) {
+    if (!attempt) {
       return NextResponse.json({ error: "Attempt not found or unauthorized" }, { status: 403 });
     }
 
@@ -54,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     logger.info("Examination finalized successfully", {
       attemptId,
-      userId: user.id,
+      userId: session.userId,
       score: result.marks_obtained,
       durationMs: Date.now() - startTime,
     });
