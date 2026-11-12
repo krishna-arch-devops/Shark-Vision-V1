@@ -3,7 +3,7 @@ import { getCurrentProfile, getDashboardPathForRole } from "@/lib/auth/session";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { User, Users } from "lucide-react";
+import { Users } from "lucide-react";
 
 export interface PlaceholderConfig {
   title: string;
@@ -26,7 +26,7 @@ export function createPlaceholderPage(config: PlaceholderConfig) {
     }
 
     const navItems: NavItem[] = [
-      { label: "Dashboard", href: getDashboardPathForRole(profile.role), icon: User },
+      { label: "Dashboard", href: getDashboardPathForRole(profile.role), iconName: "LayoutDashboard" },
     ];
 
     return (
