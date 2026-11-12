@@ -10,8 +10,8 @@ import { AnswerChangeDashboardView } from "@/components/dashboard/answer-change-
 import { TimeIntelligenceDashboardView } from "@/components/dashboard/time-intelligence-dashboard-view";
 import { SubjectsTopicsDashboardView } from "@/components/dashboard/subjects-topics-dashboard-view";
 import { QuestionExplorerView } from "@/components/dashboard/question-explorer-view";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { generateRevisionPlanAction } from "@/features/intelligence/actions/revision-actions";
 import {
   Award,
   Target,
@@ -22,8 +22,11 @@ import {
   Layers,
   Search,
   ArrowLeft,
+  Play,
+  BookmarkPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { useRouter } from "next/navigation";
 
 export interface StudentExamResultsHubProps {
   analytics: CompleteAttemptAnalytics;
@@ -36,16 +39,31 @@ export function StudentExamResultsHub({
   examTitle,
   examCategory,
 }: StudentExamResultsHubProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<
     "OVERVIEW" | "TIME" | "DECISIONS" | "SUBJECTS" | "EXPLORER"
   >("OVERVIEW");
 
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+
   const perf = analytics.performanceOverview;
+
+  const handleGenerateRevisionPlan = async () => {
+    setIsGeneratingPlan(true);
+    try {
+      await generateRevisionPlanAction(analytics.attemptId);
+      router.push("/student/revision");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsGeneratingPlan(false);
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 font-sans">
-      {/* Top Breadcrumb / Return */}
-      <div className="flex items-center justify-between">
+      {/* Top Navigation & Action Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Link
           href="/student/examinations"
           className="inline-flex items-center text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
@@ -53,9 +71,33 @@ export function StudentExamResultsHub({
           <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
           Back to Examinations
         </Link>
-        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded-md">
-          {examCategory} Examination Intelligence
-        </span>
+
+        {/* Advanced Intelligence Action Buttons */}
+        <div className="flex items-center gap-2">
+          <Link href={`/student/exams/${analytics.attemptId}/replay`}>
+            <Button size="sm" variant="outline" className="font-semibold text-xs">
+              <Play className="mr-1.5 h-3.5 w-3.5 fill-current text-sky-600" />
+              Exam Replay
+            </Button>
+          </Link>
+
+          <Link href={`/student/exams/${analytics.attemptId}/simulator`}>
+            <Button size="sm" variant="outline" className="font-semibold text-xs">
+              <Shuffle className="mr-1.5 h-3.5 w-3.5 text-violet-600" />
+              Marks Simulator
+            </Button>
+          </Link>
+
+          <Button
+            size="sm"
+            onClick={handleGenerateRevisionPlan}
+            isLoading={isGeneratingPlan}
+            className="font-semibold text-xs"
+          >
+            <BookmarkPlus className="mr-1.5 h-3.5 w-3.5" />
+            Build Revision Plan
+          </Button>
+        </div>
       </div>
 
       {/* Hero Performance Header */}

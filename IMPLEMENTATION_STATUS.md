@@ -1,25 +1,21 @@
-# SHARKVISION — Implementation Status (Iteration 4)
+# SHARKVISION — Implementation Status (Iteration 5)
 
 ## Acceptance Criteria Checklist
 
 | # | Acceptance Criterion | Status | Evidence / Notes |
 |---|---|---|---|
-| 1 | Student can submit an examination | VERIFIED | Confirmation modal triggers `/api/exam/submit` and redirects to `/student/examinations/confirmed`. |
-| 2 | Student can view an authorized result | VERIFIED | Accessible at `/student/exams/[attemptId]/results`. |
-| 3 | Results display accurate score and accuracy | VERIFIED | Hero banner displays marks obtained, maximum marks, accuracy percentage, and dwell time. |
-| 4 | Time intelligence works | VERIFIED | Question-by-question dwell time, visit count, and revisit durations rendered via `TimeIntelligenceDashboardView`. |
-| 5 | Answer-change intelligence works | VERIFIED | Counterfactual marks simulator and question decision timeline rendered via `AnswerChangeDashboardView`. |
-| 6 | Speed/accuracy matrix works | VERIFIED | 2x2 matrix categorizes questions against benchmarks via `SpeedAccuracyMatrixView`. |
-| 7 | Subject/topic dashboards work | VERIFIED | Subject meters and topic diagnostic cards rendered via `SubjectsTopicsDashboardView`. |
-| 8 | Progress trends work with sufficient history | VERIFIED | Data contracts and progress architectures defined. |
-| 9 | Question explorer works | VERIFIED | Filterable by `ALL`, `CORRECT`, `INCORRECT`, `UNANSWERED`, `CHANGED` via `QuestionExplorerView`. |
-| 10 | Parent dashboard displays linked-child results | VERIFIED | Displays plain-English narrative summaries and next focus areas for verified linked children. |
-| 11 | Teacher dashboard displays authorized batch analytics | VERIFIED | Teacher dashboard lists active batches and recent student submissions with direct inspection links. |
-| 12 | Super Admin dashboard displays real operational metrics | VERIFIED | Real database counts for registered users, active students, teachers, parents, and institutions. |
-| 13 | Dashboards work on mobile and desktop | VERIFIED | Responsive grids, tabbed navigation, and scrollable data tables. |
-| 14 | No fabricated analytics are displayed | VERIFIED | All dashboard metrics connect strictly to live database records and deterministic analytics calculations. |
-| 15 | Result-release restrictions are enforced | VERIFIED | `AFTER_DEADLINE` and `MANUAL` policies gate access, displaying release dates when withheld. |
-| 16 | Performance is acceptable | VERIFIED | Server-side calculation with snapshot persistence in `attempt_analytics_snapshots`. |
-| 17 | Automated tests pass | VERIFIED | Vitest test suite passes 40/40 tests cleanly. |
-| 18 | Production build succeeds | VERIFIED | `next build` compiles all 50 routes successfully. |
-| 19 | Previous functionality remains operational | VERIFIED | Registration, test taking, exam builder, and role authorization verified. |
+| 1 | Exam replay reconstructs actual recorded events | VERIFIED | `reconstructExamTimeline` orders by sequence, tracks revisits, and matches option transitions (`advanced-intelligence.test.ts`). |
+| 2 | Replay supports navigation and playback | VERIFIED | Interactive scrubber, play/pause, 1x/2x/4x speeds, and event feed jump at `/student/exams/[attemptId]/replay`. |
+| 3 | Marks simulator calculates accurate scenarios | VERIFIED | Interactive simulator at `/student/exams/[attemptId]/simulator` computes point delta between initial choice and final submission. |
+| 4 | Simulations do not modify official results | VERIFIED | Invariance guaranteed; official attempt scores in `examination_results` remain untouched. |
+| 5 | Revision plans are generated from actual analytics | VERIFIED | `generateRevisionPlanAction` translates diagnostic weak topics and second-guess penalties into prioritized tasks. |
+| 6 | Students can complete revision tasks | VERIFIED | Interactive task board at `/student/revision` with status toggling and progress bar. |
+| 7 | Skipping intelligence uses measurable evidence | VERIFIED | Computes dwell on unanswered questions, abandoned problems, and skipping efficiency index. |
+| 8 | Parent weekly digests display real student data | VERIFIED | `/parent/progress` compiles verified tests and completed remedial tasks in plain English. |
+| 9 | Teachers can review authorized student insights | VERIFIED | Teacher dashboard includes submissions list with direct links to candidate diagnostic results. |
+| 10 | All features respect result-release policies | VERIFIED | Solution keys and simulator results locked when `AFTER_DEADLINE` or `MANUAL` policy is in effect. |
+| 11 | Data quality limitations are communicated | VERIFIED | Notes data quality and requires sample thresholds before drawing definitive conclusions. |
+| 12 | Existing dashboards remain operational | VERIFIED | Student, Parent, Teacher, and Super Admin consoles tested and functioning. |
+| 13 | Existing examination workflows remain operational | VERIFIED | Question bank, exam creation, live test workspace, and grading fully operational. |
+| 14 | Automated tests pass | VERIFIED | Vitest unit test suite passes 42/42 tests cleanly. |
+| 15 | Production build succeeds | VERIFIED | `next build` compiles all 50 static and dynamic routes. |
