@@ -176,6 +176,7 @@ export interface Examination {
   max_attempts: number;
   result_release_policy: ExamResultPolicy;
   is_published: boolean;
+  server_deadline: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -208,6 +209,8 @@ export interface ExaminationAttempt {
   server_deadline: string;
   submitted_at?: string | null;
   last_activity_at: string;
+  total_active_time_ms?: number;
+  client_metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

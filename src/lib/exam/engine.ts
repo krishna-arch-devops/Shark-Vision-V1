@@ -1,259 +1,293 @@
-import { createClient } from "@/lib/supabase/server";
-import { StudentExamQuestion, ExaminationAttempt, ExaminationResult } from "@/types/database";
+import { db } from "@/lib/db";
+import {
+  examinations,
+  examinationQuestions,
+  examinationAttempts,
+  attemptResponses,
+  attemptEvents,
+  examinationResults,
+  questions,
+  batches,
+  batchStudents,
+  examinationAssignments,
+  profiles,
+} from "@/lib/db/schema";
+import { eq, and, desc, inArray } from "drizzle-orm";
+import {
+  StudentExamQuestion,
+  ExaminationResult,
+  ExaminationAttempt,
+  Examination,
+} from "@/types/database";
 
 export interface StudentExamSession {
   attempt: ExaminationAttempt;
-  examination: {
-    id: string;
-    title: string;
-    description: string | null;
-    category: string;
-    duration_minutes: number;
-    total_marks: number;
-    server_deadline: string;
-  };
+  examination: Examination;
   questions: StudentExamQuestion[];
-  savedResponses: Record<string, {
-    selected_option: string | null;
-    is_marked_for_review: boolean;
-    active_time_ms: number;
-  }>;
+  savedResponses: Record<
+    string,
+    {
+      selected_option: string | null;
+      is_marked_for_review: boolean;
+      active_time_ms: number;
+    }
+  >;
   serverCurrentTime: string;
 }
 
 /**
- * Start or resume an examination attempt for an authorized student.
- * Sanitizes questions to ensure correct_answer and explanations are completely excluded.
+ * Start or resume an examination attempt for an authorized student using native PostgreSQL/Drizzle.
+ * Sanitizes questions to ensure correct_answer and explanations are completely excluded from student payloads.
  */
 export async function startOrResumeExam(
   examinationId: string,
   studentId: string
 ): Promise<StudentExamSession> {
-  const supabase = await createClient();
+  const now = new Date();
 
-  // 1. Verify examination exists and is published
-  const { data: exam, error: examErr } = await supabase
-    .from("examinations")
-    .select("*")
-    .eq("id", examinationId)
-    .single();
+  // 1. Verify examination exists & is published
+  const [exam] = await db
+    .select()
+    .from(examinations)
+    .where(eq(examinations.id, examinationId))
+    .limit(1);
 
-  if (examErr || !exam || !exam.is_published) {
+  if (!exam || !exam.isPublished) {
     throw new Error("Examination not found or is currently unpublished.");
   }
 
   // 2. Verify student is enrolled in a batch assigned to this exam
-  const { data: assignment, error: assignErr } = await supabase
-    .from("examination_assignments")
-    .select("batch_id, batches!inner(batch_students!inner(student_id))")
-    .eq("examination_id", examinationId)
-    .eq("batches.batch_students.student_id", studentId)
+  const assigned = await db
+    .select({ examId: examinationAssignments.examinationId })
+    .from(examinationAssignments)
+    .innerJoin(batches, eq(examinationAssignments.batchId, batches.id))
+    .innerJoin(batchStudents, eq(batches.id, batchStudents.batchId))
+    .where(
+      and(
+        eq(examinationAssignments.examinationId, examinationId),
+        eq(batchStudents.studentId, studentId)
+      )
+    )
     .limit(1);
 
-  if (assignErr || !assignment || assignment.length === 0) {
+  if (assigned.length === 0) {
     throw new Error("You are not assigned to this examination.");
   }
 
   // 3. Verify availability window
-  const now = new Date();
-  if (now < new Date(exam.start_window)) {
+  if (now < new Date(exam.startWindow)) {
     throw new Error("This examination has not started yet.");
   }
-  if (now > new Date(exam.end_window)) {
+  if (now > new Date(exam.endWindow)) {
     throw new Error("This examination availability window has closed.");
   }
 
   // 4. Check for existing active attempt (idempotent resume)
-  const { data: existingAttempts } = await supabase
-    .from("examination_attempts")
-    .select("*")
-    .eq("examination_id", examinationId)
-    .eq("student_id", studentId)
-    .order("attempt_number", { ascending: false });
+  const existingAttempts = await db
+    .select()
+    .from(examinationAttempts)
+    .where(
+      and(
+        eq(examinationAttempts.examinationId, examinationId),
+        eq(examinationAttempts.studentId, studentId)
+      )
+    )
+    .orderBy(desc(examinationAttempts.attemptNumber));
 
-  let activeAttempt: ExaminationAttempt | null = null;
+  let activeAttempt = existingAttempts.find((a) => a.status === "IN_PROGRESS" || a.status === "CREATED");
 
-  if (existingAttempts && existingAttempts.length > 0) {
-    const latest = existingAttempts[0] as ExaminationAttempt;
-    if (latest.status === "IN_PROGRESS" || latest.status === "CREATED") {
-      // Check if server deadline has expired
-      if (now > new Date(latest.server_deadline)) {
-        // Auto-finalize expired attempt
-        await finalizeAttempt(latest.id, "AUTO_SUBMITTED");
-        throw new Error("Your examination session has expired.");
-      }
-      activeAttempt = latest;
-    } else {
-      // Already submitted/expired
-      if (existingAttempts.length >= exam.max_attempts) {
-        throw new Error("You have reached the maximum allowed attempts for this examination.");
-      }
-    }
-  }
-
-  // If no active attempt exists, create one
   if (!activeAttempt) {
-    const attemptNumber = (existingAttempts?.length || 0) + 1;
-    const deadline = new Date(now.getTime() + exam.duration_minutes * 60 * 1000);
+    // Check attempt limits
+    if (existingAttempts.length >= exam.maxAttempts) {
+      throw new Error(`Maximum attempts (${exam.maxAttempts}) reached for this examination.`);
+    }
 
-    // If exam end_window is sooner than duration, clamp to end_window
-    const examEndWindow = new Date(exam.end_window);
-    const serverDeadline = deadline < examEndWindow ? deadline : examEndWindow;
+    const nextAttemptNumber = existingAttempts.length + 1;
+    const deadline = new Date(now.getTime() + exam.durationMinutes * 60000);
 
-    const { data: newAttempt, error: createErr } = await supabase
-      .from("examination_attempts")
-      .insert({
-        examination_id: examinationId,
-        student_id: studentId,
-        attempt_number: attemptNumber,
+    const [newAttempt] = await db
+      .insert(examinationAttempts)
+      .values({
+        examinationId,
+        studentId,
+        attemptNumber: nextAttemptNumber,
         status: "IN_PROGRESS",
-        started_at: now.toISOString(),
-        server_deadline: serverDeadline.toISOString(),
-        last_activity_at: now.toISOString(),
+        startedAt: now,
+        serverDeadline: deadline,
       })
-      .select()
-      .single();
+      .returning();
 
-    if (createErr || !newAttempt) {
-      throw new Error(`Failed to initialize examination attempt: ${createErr?.message}`);
-    }
-
-    activeAttempt = newAttempt as ExaminationAttempt;
+    activeAttempt = newAttempt;
   }
 
-  // 5. Fetch questions SANITIZED (DO NOT EXPOSE snapshot_correct_answer or snapshot_explanation)
-  const { data: examQuestions, error: eqErr } = await supabase
-    .from("examination_questions")
-    .select("question_id, question_order, marks, negative_marks, snapshot_text, snapshot_options, snapshot_image_url")
-    .eq("examination_id", examinationId)
-    .order("question_order", { ascending: true });
+  // 5. Fetch questions WITHOUT answers or explanations
+  const examQuestionsList = await db
+    .select({
+      id: examinationQuestions.id,
+      questionId: examinationQuestions.questionId,
+      questionOrder: examinationQuestions.questionOrder,
+      marks: examinationQuestions.marks,
+      negativeMarks: examinationQuestions.negativeMarks,
+      snapshotText: examinationQuestions.snapshotText,
+      snapshotOptions: examinationQuestions.snapshotOptions,
+      snapshotImageUrl: examinationQuestions.snapshotImageUrl,
+    })
+    .from(examinationQuestions)
+    .where(eq(examinationQuestions.examinationId, examinationId))
+    .orderBy(examinationQuestions.questionOrder);
 
-  if (eqErr || !examQuestions) {
-    throw new Error("Failed to load examination question set.");
-  }
+  // 6. Fetch existing responses for this attempt
+  const responses = await db
+    .select()
+    .from(attemptResponses)
+    .where(eq(attemptResponses.attemptId, activeAttempt.id));
 
-  const sanitizedQuestions: StudentExamQuestion[] = examQuestions.map((q) => ({
-    question_id: q.question_id,
-    question_order: q.question_order,
-    marks: Number(q.marks),
-    negative_marks: Number(q.negative_marks),
-    question_text: q.snapshot_text,
-    image_url: q.snapshot_image_url,
-    options: q.snapshot_options,
-  }));
-
-  // 6. Fetch any previously saved responses for recovery
-  const { data: responses } = await supabase
-    .from("attempt_responses")
-    .select("question_id, selected_option, is_marked_for_review, active_time_ms")
-    .eq("attempt_id", activeAttempt.id);
-
-  const savedResponses: Record<string, {
-    selected_option: string | null;
-    is_marked_for_review: boolean;
-    active_time_ms: number;
-  }> = {};
-
-  if (responses) {
-    for (const r of responses) {
-      savedResponses[r.question_id] = {
-        selected_option: r.selected_option,
-        is_marked_for_review: r.is_marked_for_review,
-        active_time_ms: Number(r.active_time_ms || 0),
-      };
+  const savedMap: Record<
+    string,
+    {
+      selected_option: string | null;
+      is_marked_for_review: boolean;
+      active_time_ms: number;
     }
+  > = {};
+
+  for (const r of responses) {
+    savedMap[r.questionId] = {
+      selected_option: r.selectedOption,
+      is_marked_for_review: r.isMarkedForReview,
+      active_time_ms: Number(r.activeTimeMs),
+    };
   }
 
   return {
-    attempt: activeAttempt,
+    attempt: {
+      id: activeAttempt.id,
+      examination_id: activeAttempt.examinationId,
+      student_id: activeAttempt.studentId,
+      attempt_number: activeAttempt.attemptNumber,
+      status: activeAttempt.status as any,
+      started_at: activeAttempt.startedAt ? activeAttempt.startedAt.toISOString() : now.toISOString(),
+      submitted_at: activeAttempt.submittedAt ? activeAttempt.submittedAt.toISOString() : null,
+      server_deadline: activeAttempt.serverDeadline.toISOString(),
+      total_active_time_ms: Number(activeAttempt.totalActiveTimeMs),
+      last_activity_at: activeAttempt.updatedAt.toISOString(),
+      client_metadata: (activeAttempt.clientMetadata as Record<string, unknown>) || null,
+      created_at: activeAttempt.createdAt.toISOString(),
+      updated_at: activeAttempt.updatedAt.toISOString(),
+    },
     examination: {
       id: exam.id,
       title: exam.title,
       description: exam.description,
       category: exam.category,
-      duration_minutes: exam.duration_minutes,
-      total_marks: Number(exam.total_marks),
-      server_deadline: activeAttempt.server_deadline,
+      duration_minutes: exam.durationMinutes,
+      total_marks: Number(exam.totalMarks),
+      start_window: exam.startWindow.toISOString(),
+      end_window: exam.endWindow.toISOString(),
+      max_attempts: exam.maxAttempts,
+      result_release_policy: exam.resultReleasePolicy as any,
+      is_published: exam.isPublished,
+      server_deadline: activeAttempt.serverDeadline.toISOString(),
+      created_by: exam.createdBy,
+      created_at: exam.createdAt.toISOString(),
+      updated_at: exam.updatedAt.toISOString(),
     },
-    questions: sanitizedQuestions,
-    savedResponses,
-    serverCurrentTime: new Date().toISOString(),
+    questions: examQuestionsList.map((q) => ({
+      id: q.id,
+      question_id: q.questionId,
+      question_order: q.questionOrder,
+      marks: Number(q.marks),
+      negative_marks: Number(q.negativeMarks),
+      question_text: q.snapshotText,
+      options: q.snapshotOptions as any,
+      image_url: q.snapshotImageUrl,
+    })),
+    savedResponses: savedMap,
+    serverCurrentTime: now.toISOString(),
   };
 }
 
 /**
- * Authoritative server-side grading and attempt finalization.
+ * Authoritative server-side scoring & exam finalization on native PostgreSQL.
  */
 export async function finalizeAttempt(
   attemptId: string,
-  finalStatus: "SUBMITTED" | "AUTO_SUBMITTED" = "SUBMITTED"
+  finalStatus: "SUBMITTED" | "AUTO_SUBMITTED" | "TIMED_OUT" = "SUBMITTED"
 ): Promise<ExaminationResult> {
-  const supabase = await createClient();
   const now = new Date();
 
   // 1. Fetch attempt and exam
-  const { data: attempt, error: aErr } = await supabase
-    .from("examination_attempts")
-    .select("*, examinations!inner(*)")
-    .eq("id", attemptId)
-    .single();
+  const [attempt] = await db
+    .select()
+    .from(examinationAttempts)
+    .where(eq(examinationAttempts.id, attemptId))
+    .limit(1);
 
-  if (aErr || !attempt) {
+  if (!attempt) {
     throw new Error("Attempt not found.");
   }
 
   // Idempotency: If already graded, return existing result
   if (attempt.status === "SUBMITTED" || attempt.status === "AUTO_SUBMITTED") {
-    const { data: existingResult } = await supabase
-      .from("examination_results")
-      .select("*")
-      .eq("attempt_id", attemptId)
-      .single();
+    const [existing] = await db
+      .select()
+      .from(examinationResults)
+      .where(eq(examinationResults.attemptId, attemptId))
+      .limit(1);
 
-    if (existingResult) {
-      return existingResult as ExaminationResult;
+    if (existing) {
+      return {
+        id: existing.id,
+        attempt_id: existing.attemptId,
+        examination_id: existing.examinationId,
+        student_id: existing.studentId,
+        total_questions: existing.totalQuestions,
+        attempted_questions: existing.attemptedQuestions,
+        correct_answers: existing.correctAnswers,
+        incorrect_answers: existing.incorrectAnswers,
+        unanswered_questions: existing.unansweredQuestions,
+        marks_obtained: Number(existing.marksObtained),
+        max_marks: Number(existing.maxMarks),
+        accuracy_percentage: Number(existing.accuracyPercentage),
+        graded_at: existing.gradedAt.toISOString(),
+        grading_version: existing.gradingVersion,
+      };
     }
   }
 
-  // 2. Fetch authoritative snapshot questions with correct answers
-  const { data: examQuestions, error: eqErr } = await supabase
-    .from("examination_questions")
-    .select("question_id, marks, negative_marks, snapshot_correct_answer")
-    .eq("examination_id", attempt.examination_id);
-
-  if (eqErr || !examQuestions) {
-    throw new Error("Unable to retrieve examination grading keys.");
-  }
+  // 2. Fetch snapshot questions with authoritative answers
+  const examQuestionsList = await db
+    .select()
+    .from(examinationQuestions)
+    .where(eq(examinationQuestions.examinationId, attempt.examinationId));
 
   // 3. Fetch candidate's accepted responses
-  const { data: responses } = await supabase
-    .from("attempt_responses")
-    .select("question_id, selected_option")
-    .eq("attempt_id", attemptId);
+  const responses = await db
+    .select()
+    .from(attemptResponses)
+    .where(eq(attemptResponses.attemptId, attemptId));
 
   const responseMap = new Map<string, string | null>();
-  if (responses) {
-    for (const r of responses) {
-      responseMap.set(r.question_id, r.selected_option);
-    }
+  for (const r of responses) {
+    responseMap.set(r.questionId, r.selectedOption);
   }
 
-  // 4. Perform authoritative scoring
+  // 4. Calculate score
   let correctCount = 0;
   let incorrectCount = 0;
   let attemptedCount = 0;
   let marksObtained = 0;
   let maxMarks = 0;
 
-  for (const q of examQuestions) {
+  for (const q of examQuestionsList) {
     const qMarks = Number(q.marks || 4);
-    const qNeg = Number(q.negative_marks || 1);
+    const qNeg = Number(q.negativeMarks || 1);
     maxMarks += qMarks;
 
-    const studentAnswer = responseMap.get(q.question_id);
-    if (studentAnswer) {
+    const studentAns = responseMap.get(q.questionId);
+    if (studentAns) {
       attemptedCount++;
-      if (studentAnswer.trim().toUpperCase() === q.snapshot_correct_answer.trim().toUpperCase()) {
+      if (studentAns.trim().toUpperCase() === q.snapshotCorrectAnswer.trim().toUpperCase()) {
         correctCount++;
         marksObtained += qMarks;
       } else {
@@ -263,43 +297,61 @@ export async function finalizeAttempt(
     }
   }
 
-  const unansweredCount = examQuestions.length - attemptedCount;
+  const unansweredCount = examQuestionsList.length - attemptedCount;
   const accuracyPercentage = attemptedCount > 0 ? (correctCount / attemptedCount) * 100 : 0;
 
   // 5. Update attempt status
-  await supabase
-    .from("examination_attempts")
-    .update({
-      status: finalStatus,
-      submitted_at: now.toISOString(),
-      updated_at: now.toISOString(),
+  await db
+    .update(examinationAttempts)
+    .set({
+      status: finalStatus as any,
+      submittedAt: now,
+      updatedAt: now,
     })
-    .eq("id", attemptId);
+    .where(eq(examinationAttempts.id, attemptId));
 
-  // 6. Persist result
-  const { data: result, error: resErr } = await supabase
-    .from("examination_results")
-    .upsert({
-      attempt_id: attemptId,
-      examination_id: attempt.examination_id,
-      student_id: attempt.student_id,
-      total_questions: examQuestions.length,
-      attempted_questions: attemptedCount,
-      correct_answers: correctCount,
-      incorrect_answers: incorrectCount,
-      unanswered_questions: unansweredCount,
-      marks_obtained: marksObtained,
-      max_marks: maxMarks,
-      accuracy_percentage: Number(accuracyPercentage.toFixed(2)),
-      graded_at: now.toISOString(),
-      grading_version: 1,
+  // 6. Record result
+  const [result] = await db
+    .insert(examinationResults)
+    .values({
+      attemptId,
+      examinationId: attempt.examinationId,
+      studentId: attempt.studentId,
+      totalQuestions: examQuestionsList.length,
+      attemptedQuestions: attemptedCount,
+      correctAnswers: correctCount,
+      incorrectAnswers: incorrectCount,
+      unansweredQuestions: unansweredCount,
+      marksObtained: marksObtained.toFixed(2),
+      maxMarks: maxMarks.toFixed(2),
+      accuracyPercentage: accuracyPercentage.toFixed(2),
+      gradedAt: now,
+      gradingVersion: 1,
     })
-    .select()
-    .single();
+    .onConflictDoUpdate({
+      target: examinationResults.attemptId,
+      set: {
+        marksObtained: marksObtained.toFixed(2),
+        accuracyPercentage: accuracyPercentage.toFixed(2),
+        gradedAt: now,
+      },
+    })
+    .returning();
 
-  if (resErr || !result) {
-    throw new Error(`Failed to record examination result: ${resErr?.message}`);
-  }
-
-  return result as ExaminationResult;
+  return {
+    id: result.id,
+    attempt_id: result.attemptId,
+    examination_id: result.examinationId,
+    student_id: result.studentId,
+    total_questions: result.totalQuestions,
+    attempted_questions: result.attemptedQuestions,
+    correct_answers: result.correctAnswers,
+    incorrect_answers: result.incorrectAnswers,
+    unanswered_questions: result.unansweredQuestions,
+    marks_obtained: Number(result.marksObtained),
+    max_marks: Number(result.maxMarks),
+    accuracy_percentage: Number(result.accuracyPercentage),
+    graded_at: result.gradedAt.toISOString(),
+    grading_version: result.gradingVersion,
+  };
 }
