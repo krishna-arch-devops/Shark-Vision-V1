@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { AnalyticsService } from "@/features/analytics/services/analytics-service";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ attemptId: string }> }
 ) {
+  const startTime = Date.now();
   try {
     const { attemptId } = await params;
     const supabase = await createClient();
@@ -16,6 +19,16 @@ export async function GET(
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit analytics requests: 60 per minute per user
+    const rl = checkRateLimit(`analytics_${user.id}`, { windowMs: 60 * 1000, maxRequests: 60 });
+    if (!rl.allowed) {
+      logger.warn("Rate limit exceeded on analytics view", { userId: user.id });
+      return NextResponse.json(
+        { error: "Too many analytics requests. Please wait." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.resetMs / 1000)) } }
+      );
     }
 
     // Verify user role & attempt authorization
@@ -88,10 +101,18 @@ export async function GET(
     const analyticsService = new AnalyticsService();
     const analytics = await analyticsService.getOrComputeAttemptAnalytics(attemptId);
 
+    logger.debug("Analytics retrieved successfully", {
+      attemptId,
+      userId: user.id,
+      role: profile.role,
+      durationMs: Date.now() - startTime,
+    });
+
     return NextResponse.json({ success: true, data: analytics });
   } catch (error: any) {
+    logger.error("Failed to retrieve attempt analytics", { error });
     return NextResponse.json(
-      { error: error.message || "Failed to retrieve analytics" },
+      { error: "Failed to retrieve analytics" },
       { status: 500 }
     );
   }
