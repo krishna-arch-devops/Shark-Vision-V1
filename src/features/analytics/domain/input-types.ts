@@ -8,6 +8,7 @@ export interface RawExamSnapshotQuestion {
   snapshot_text: string;
   snapshot_options: any;
   snapshot_correct_answer: string;
+  snapshot_explanation?: string | null;
   snapshot_benchmark_seconds?: number | null;
   subject_id?: string;
   subject_name?: string;

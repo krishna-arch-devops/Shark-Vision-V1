@@ -71,6 +71,11 @@ export interface QuestionAnswerChangeAnalysis {
   questionId: string;
   firstSelectedOption: string | null;
   finalAcceptedOption: string | null;
+  correctAnswer?: string;
+  questionText?: string;
+  options?: Array<{ id: string; text: string }>;
+  explanation?: string | null;
+  topic?: string;
   changeCount: number;
   clearCount: number;
   changedDuringRevisit: boolean;
