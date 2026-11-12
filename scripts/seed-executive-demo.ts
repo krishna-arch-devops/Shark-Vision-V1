@@ -136,7 +136,7 @@ export async function seedExecutiveDemo() {
     // General Knowledge (8 Questions)
     {
       subjectId: gkSubject.id,
-      topic: "Geography & Capitals",
+      topic: "World Geography",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "What is the capital city of India?",
@@ -151,7 +151,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: gkSubject.id,
-      topic: "Physical Geography",
+      topic: "World Geography",
       difficulty: "EASY" as const,
       benchmarkSeconds: 30,
       questionText: "Which is the largest and deepest ocean on Earth?",
@@ -163,21 +163,6 @@ export async function seedExecutiveDemo() {
       ],
       correctAnswer: "D",
       explanation: "The Pacific Ocean is the largest and deepest of Earth's oceanic divisions.",
-    },
-    {
-      subjectId: gkSubject.id,
-      topic: "Time & Calendars",
-      difficulty: "EASY" as const,
-      benchmarkSeconds: 20,
-      questionText: "How many days are there in a standard solar leap year?",
-      options: [
-        { id: "A", text: "364 days" },
-        { id: "B", text: "365 days" },
-        { id: "C", text: "366 days" },
-        { id: "D", text: "367 days" },
-      ],
-      correctAnswer: "C",
-      explanation: "A leap year contains 366 days, with an extra day added in February (February 29).",
     },
     {
       subjectId: gkSubject.id,
@@ -196,37 +181,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: gkSubject.id,
-      topic: "National Symbols",
-      difficulty: "EASY" as const,
-      benchmarkSeconds: 20,
-      questionText: "What is the national animal of India?",
-      options: [
-        { id: "A", text: "Asiatic Lion" },
-        { id: "B", text: "Bengal Tiger" },
-        { id: "C", text: "Indian Elephant" },
-        { id: "D", text: "Indian Rhinoceros" },
-      ],
-      correctAnswer: "B",
-      explanation: "The Royal Bengal Tiger (Panthera tigris) is the national animal of India.",
-    },
-    {
-      subjectId: gkSubject.id,
-      topic: "Inventions & Tech",
-      difficulty: "MEDIUM" as const,
-      benchmarkSeconds: 35,
-      questionText: "Who is widely credited with the invention of the World Wide Web in 1989?",
-      options: [
-        { id: "A", text: "Steve Jobs" },
-        { id: "B", text: "Bill Gates" },
-        { id: "C", text: "Tim Berners-Lee" },
-        { id: "D", text: "Alan Turing" },
-      ],
-      correctAnswer: "C",
-      explanation: "Sir Tim Berners-Lee invented the World Wide Web while working at CERN in 1989.",
-    },
-    {
-      subjectId: gkSubject.id,
-      topic: "Global Landmarks",
+      topic: "World Geography",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "In which country can you visit the ancient historical amphitheatre known as the Colosseum?",
@@ -241,7 +196,52 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: gkSubject.id,
-      topic: "Monetary Systems",
+      topic: "General Awareness",
+      difficulty: "EASY" as const,
+      benchmarkSeconds: 20,
+      questionText: "How many days are there in a standard solar leap year?",
+      options: [
+        { id: "A", text: "364 days" },
+        { id: "B", text: "365 days" },
+        { id: "C", text: "366 days" },
+        { id: "D", text: "367 days" },
+      ],
+      correctAnswer: "C",
+      explanation: "A leap year contains 366 days, with an extra day added in February (February 29).",
+    },
+    {
+      subjectId: gkSubject.id,
+      topic: "General Awareness",
+      difficulty: "EASY" as const,
+      benchmarkSeconds: 20,
+      questionText: "What is the national animal of India?",
+      options: [
+        { id: "A", text: "Asiatic Lion" },
+        { id: "B", text: "Bengal Tiger" },
+        { id: "C", text: "Indian Elephant" },
+        { id: "D", text: "Indian Rhinoceros" },
+      ],
+      correctAnswer: "B",
+      explanation: "The Royal Bengal Tiger (Panthera tigris) is the national animal of India.",
+    },
+    {
+      subjectId: gkSubject.id,
+      topic: "General Awareness",
+      difficulty: "MEDIUM" as const,
+      benchmarkSeconds: 35,
+      questionText: "Who is widely credited with the invention of the World Wide Web in 1989?",
+      options: [
+        { id: "A", text: "Steve Jobs" },
+        { id: "B", text: "Bill Gates" },
+        { id: "C", text: "Tim Berners-Lee" },
+        { id: "D", text: "Alan Turing" },
+      ],
+      correctAnswer: "C",
+      explanation: "Sir Tim Berners-Lee invented the World Wide Web while working at CERN in 1989.",
+    },
+    {
+      subjectId: gkSubject.id,
+      topic: "General Awareness",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "What is the official currency of Japan?",
@@ -258,7 +258,7 @@ export async function seedExecutiveDemo() {
     // Basic Science (4 Questions)
     {
       subjectId: sciSubject.id,
-      topic: "Solar System",
+      topic: "Natural & Physical Science",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "Which planet in our solar system is known as the 'Red Planet' due to iron oxide on its surface?",
@@ -273,7 +273,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: sciSubject.id,
-      topic: "Human Biology",
+      topic: "Natural & Physical Science",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "Which vital organ in the human body is primarily responsible for pumping blood throughout the circulatory system?",
@@ -288,7 +288,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: sciSubject.id,
-      topic: "Everyday Physics",
+      topic: "Natural & Physical Science",
       difficulty: "EASY" as const,
       benchmarkSeconds: 30,
       questionText: "At standard atmospheric pressure, at what temperature does pure water freeze into solid ice?",
@@ -303,7 +303,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: sciSubject.id,
-      topic: "Plant Biology",
+      topic: "Natural & Physical Science",
       difficulty: "MEDIUM" as const,
       benchmarkSeconds: 35,
       questionText: "What natural green pigment do plants use to capture sunlight during photosynthesis?",
@@ -320,7 +320,7 @@ export async function seedExecutiveDemo() {
     // Basic Mathematics (4 Questions)
     {
       subjectId: mathSubject.id,
-      topic: "Arithmetic Operations",
+      topic: "Elementary Mathematics",
       difficulty: "EASY" as const,
       benchmarkSeconds: 20,
       questionText: "What is the exact sum of 15 + 25?",
@@ -335,7 +335,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: mathSubject.id,
-      topic: "Mental Arithmetic",
+      topic: "Elementary Mathematics",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "What is the product of 12 multiplied by 8?",
@@ -350,7 +350,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: mathSubject.id,
-      topic: "Elementary Geometry",
+      topic: "Elementary Mathematics",
       difficulty: "EASY" as const,
       benchmarkSeconds: 20,
       questionText: "What is the sum of the interior angles of any planar triangle?",
@@ -365,7 +365,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: mathSubject.id,
-      topic: "Percentages",
+      topic: "Elementary Mathematics",
       difficulty: "MEDIUM" as const,
       benchmarkSeconds: 35,
       questionText: "If an item is regularly priced at Rs. 200 and is sold at a 25% discount, what is the final selling price?",
@@ -382,7 +382,7 @@ export async function seedExecutiveDemo() {
     // Logical Reasoning (4 Questions)
     {
       subjectId: lrSubject.id,
-      topic: "Number Sequences",
+      topic: "Logical Reasoning & Aptitude",
       difficulty: "EASY" as const,
       benchmarkSeconds: 30,
       questionText: "Find the next logical number in the sequence: 2, 4, 8, 16, ___",
@@ -397,7 +397,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: lrSubject.id,
-      topic: "Categorical Classification",
+      topic: "Logical Reasoning & Aptitude",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "Identify the odd one out from the following four options:",
@@ -412,7 +412,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: lrSubject.id,
-      topic: "Verbal Analogies",
+      topic: "Logical Reasoning & Aptitude",
       difficulty: "EASY" as const,
       benchmarkSeconds: 25,
       questionText: "Complete the relationship analogy: Book is to Reading as Fork is to ___",
@@ -427,7 +427,7 @@ export async function seedExecutiveDemo() {
     },
     {
       subjectId: lrSubject.id,
-      topic: "Clock & Spatial Aptitude",
+      topic: "Logical Reasoning & Aptitude",
       difficulty: "MEDIUM" as const,
       benchmarkSeconds: 40,
       questionText: "If a standard analog clock displays exactly 3:00, what is the angle between the hour hand and the minute hand?",
@@ -474,6 +474,15 @@ export async function seedExecutiveDemo() {
           createdBy: superAdmin?.id,
         })
         .returning();
+    } else {
+      // Update topic to ensure coherent clusters
+      await db
+        .update(questions)
+        .set({
+          topic: qData.topic,
+          subjectId: qData.subjectId,
+        })
+        .where(eq(questions.id, q.id));
     }
 
     insertedQuestionIds.push({
@@ -547,8 +556,14 @@ export async function seedExecutiveDemo() {
         snapshotText: qItem.snapshotText,
         snapshotOptions: qItem.snapshotOptions,
         snapshotCorrectAnswer: qItem.snapshotCorrectAnswer,
+        snapshotBenchmarkSeconds: qItem.benchmark,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [examinationQuestions.examinationId, examinationQuestions.questionId],
+        set: {
+          snapshotBenchmarkSeconds: qItem.benchmark,
+        },
+      });
   }
   console.log(`✓ Associated all 20 questions with Examination ${demoExam.id}`);
 

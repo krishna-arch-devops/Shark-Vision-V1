@@ -186,7 +186,7 @@ export function calculateTopicAnalytics(
     const averageActiveTimeMs =
       attemptedQuestions > 0 ? Math.round(totalActiveTimeMs / attemptedQuestions) : 0;
 
-    // Minimum sample check for topic classification
+    // Topic classification
     let classification: TopicProficiency = "INSUFFICIENT_DATA";
     let evidence = `Evaluated on ${attemptedQuestions} attempted question(s).`;
 
@@ -196,7 +196,7 @@ export function calculateTopicAnalytics(
         evidence = `High accuracy of ${accuracyPercentage}% across ${attemptedQuestions} questions.`;
       } else if (accuracyPercentage !== null && accuracyPercentage <= 40) {
         classification = "NEEDS_ATTENTION";
-        evidence = `Low accuracy of ${accuracyPercentage}% with ${incorrectAnswers} error(s).`;
+        evidence = `Low accuracy of ${accuracyPercentage}% with ${incorrectAnswers} error(s). Review core concepts.`;
       } else {
         classification = "IMPROVING";
         evidence = `Moderate accuracy of ${accuracyPercentage}%. Consistent practice recommended.`;

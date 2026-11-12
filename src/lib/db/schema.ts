@@ -319,6 +319,7 @@ export const examinationQuestions = pgTable(
     snapshotImageUrl: text("snapshot_image_url"),
     snapshotCorrectAnswer: text("snapshot_correct_answer").notNull(),
     snapshotExplanation: text("snapshot_explanation"),
+    snapshotBenchmarkSeconds: integer("snapshot_benchmark_seconds").default(60),
   },
   (table) => [
     unique("uq_exam_question").on(table.examinationId, table.questionId),
