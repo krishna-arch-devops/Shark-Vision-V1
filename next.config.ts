@@ -21,6 +21,7 @@ const cspHeader = `
   .trim();
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   turbopack: {
     rules: {
       "*.css": {
