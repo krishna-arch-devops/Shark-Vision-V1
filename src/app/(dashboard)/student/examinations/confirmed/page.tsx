@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default async function ConfirmedExamPage({
@@ -28,10 +28,17 @@ export default async function ConfirmedExamPage({
         )}
 
         <div className="flex flex-col gap-2">
+          {attemptId && (
+            <Link href={`/student/exams/${attemptId}/results`}>
+              <Button className="w-full">
+                <BarChart3 className="mr-1.5 h-4 w-4" />
+                View Test Analytics & Performance
+              </Button>
+            </Link>
+          )}
           <Link href="/student/examinations">
-            <Button className="w-full">
+            <Button variant="outline" className="w-full text-xs">
               Back to My Examinations
-              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Button>
           </Link>
           <Link href="/student">

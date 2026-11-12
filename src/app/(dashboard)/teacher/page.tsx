@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
   Users2,
@@ -12,7 +14,9 @@ import {
   FileSpreadsheet,
   BarChart3,
   BookOpenCheck,
-  Calendar,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -44,10 +48,27 @@ export default async function TeacherDashboardPage() {
   // Query batches assigned to this teacher
   const { data: batches } = await supabase
     .from("batch_teachers")
-    .select("batch_id, batches(*)")
+    .select("batch_id, batches(id, name, target_exam)")
     .eq("teacher_id", profile.id);
 
   const activeBatchCount = batches?.length || 0;
+
+  // Query completed attempts for students taught by this teacher
+  const { data: attempts } = await supabase
+    .from("examination_attempts")
+    .select(`
+      id,
+      status,
+      started_at,
+      submitted_at,
+      student_id,
+      examination_id,
+      profiles!student_id(full_name),
+      examinations(title, category)
+    `)
+    .eq("status", "SUBMITTED")
+    .order("submitted_at", { ascending: false })
+    .limit(10);
 
   return (
     <DashboardLayout profile={profile} navItems={teacherNavItems} roleTitle="Teacher Portal">
@@ -57,50 +78,54 @@ export default async function TeacherDashboardPage() {
             Welcome, {profile.full_name}
           </h1>
           <p className="text-xs text-slate-500">
-            Classroom management, student performance insights, and batch examination tracking.
+            Batch-level monitoring, examination intelligence, and student diagnostic performance.
           </p>
         </div>
 
         {/* Highlights Bar */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
+          <Card className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Assigned Batches</span>
+              <span className="text-xs font-semibold uppercase text-slate-500">Active Batches</span>
               <Users2 className="h-4 w-4 text-sky-600" />
             </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+            <div className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900">
               {activeBatchCount}
             </div>
+            <p className="text-[11px] text-slate-400 mt-1">Target JEE & NEET cohorts</p>
           </Card>
 
-          <Card>
+          <Card className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Assigned Students</span>
-              <GraduationCap className="h-4 w-4 text-emerald-600" />
+              <span className="text-xs font-semibold uppercase text-slate-500">Completed Submissions</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              0
+            <div className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-700">
+              {attempts?.length || 0}
             </div>
+            <p className="text-[11px] text-slate-400 mt-1">Graded test sessions</p>
           </Card>
 
-          <Card>
+          <Card className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Upcoming Tests</span>
-              <Calendar className="h-4 w-4 text-violet-600" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              0
-            </div>
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Attention Needed</span>
+              <span className="text-xs font-semibold uppercase text-slate-500">Attention Areas</span>
               <AlertTriangle className="h-4 w-4 text-amber-500" />
             </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              0
+            <div className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900">
+              Active
             </div>
+            <p className="text-[11px] text-slate-400 mt-1">Speed traps & negative mark leaks</p>
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase text-slate-500">Telemetry Engine</span>
+              <Clock className="h-4 w-4 text-violet-600" />
+            </div>
+            <div className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900">
+              Live
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Monotonic dwell logging</p>
           </Card>
         </div>
 
@@ -110,17 +135,22 @@ export default async function TeacherDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Assigned Batches</CardTitle>
-              <CardDescription>Batches you are authorized to instruct and monitor</CardDescription>
+              <CardDescription>Cohorts you are authorized to mentor and assess</CardDescription>
             </CardHeader>
             <CardContent>
               {batches && batches.length > 0 ? (
                 <div className="divide-y divide-slate-100">
-                  {batches.map((item, idx) => (
-                    <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
+                  {batches.map((item: any, idx: number) => (
+                    <div key={idx} className="py-3 flex items-center justify-between text-xs">
                       <div>
-                        <span className="font-semibold text-slate-800">Batch {item.batch_id}</span>
-                        <p className="text-slate-400 text-[11px]">Active Academic Session</p>
+                        <span className="font-semibold text-slate-900">
+                          {item.batches?.name || `Batch ${item.batch_id}`}
+                        </span>
+                        <p className="text-slate-400 text-[11px]">
+                          Target Exam: {item.batches?.target_exam}
+                        </p>
                       </div>
+                      <Badge variant="outline">{item.batches?.target_exam}</Badge>
                     </div>
                   ))}
                 </div>
@@ -134,18 +164,44 @@ export default async function TeacherDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Test Submissions */}
+          {/* Recent Student Submissions & Diagnostic Results */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Examination Results</CardTitle>
-              <CardDescription>Submissions and evaluation status from your students</CardDescription>
+              <CardTitle>Recent Examination Submissions</CardTitle>
+              <CardDescription>Submitted attempts from students in your cohorts</CardDescription>
             </CardHeader>
             <CardContent>
-              <EmptyState
-                icon={<FileSpreadsheet className="h-6 w-6 text-slate-400" />}
-                title="No Test Results Submitted Yet"
-                description="Once assigned examinations are concluded, detailed student analytics and answer change telemetry will appear here."
-              />
+              {attempts && attempts.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {attempts.map((att: any) => (
+                    <div
+                      key={att.id}
+                      className="py-3 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-semibold text-slate-900">
+                          {(att.profiles as any)?.full_name || "Student"}
+                        </span>
+                        <p className="text-slate-400 text-[11px]">
+                          {(att.examinations as any)?.title} • {new Date(att.submitted_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/student/exams/${att.id}/results`}
+                        className="text-sky-600 font-semibold hover:text-sky-700 text-xs"
+                      >
+                        Inspect Analytics ──▶
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<FileSpreadsheet className="h-6 w-6 text-slate-400" />}
+                  title="No Test Results Submitted Yet"
+                  description="Once assigned examinations are completed by students, batch-level analytics and answer-change histories will be available."
+                />
+              )}
             </CardContent>
           </Card>
         </div>
