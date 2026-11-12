@@ -2,30 +2,21 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { ExamBuilderForm } from "@/components/exam/exam-builder-form";
-import {
-  LayoutDashboard,
-  Users2,
-  GraduationCap,
-  HelpCircle,
-  FilePlus,
-  FileSpreadsheet,
-  BarChart3,
-  BookOpenCheck,
-} from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { questions, batches } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const teacherNavItems: NavItem[] = [
-  { label: "Overview", href: "/teacher", icon: LayoutDashboard },
-  { label: "My Batches", href: "/teacher/batches", icon: Users2 },
-  { label: "My Students", href: "/teacher/students", icon: GraduationCap },
-  { label: "Question Bank", href: "/teacher/questions", icon: HelpCircle },
-  { label: "Create Examination", href: "/teacher/examinations/create", icon: FilePlus },
-  { label: "Examinations", href: "/teacher/examinations", icon: FileSpreadsheet },
-  { label: "Performance Analytics", href: "/teacher/analytics", icon: BarChart3 },
-  { label: "Assignments", href: "/teacher/assignments", icon: BookOpenCheck },
+  { label: "Overview", href: "/teacher", iconName: "LayoutDashboard" },
+  { label: "Batches", href: "/teacher/batches", iconName: "Users" },
+  { label: "Question Bank", href: "/teacher/questions", iconName: "FileQuestion" },
+  { label: "Examinations", href: "/teacher/examinations", iconName: "FileSpreadsheet" },
+  { label: "Assignments", href: "/teacher/assignments", iconName: "BookmarkCheck" },
+  { label: "Cohort Analytics", href: "/teacher/analytics", iconName: "BarChart3" },
+  { label: "Students", href: "/teacher/students", iconName: "User" },
 ];
 
-export default async function TeacherExamCreatePage() {
+export default async function CreateExaminationPage() {
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -36,25 +27,24 @@ export default async function TeacherExamCreatePage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  const questionsList = await db
+    .select({
+      id: questions.id,
+      topic: questions.topic,
+      difficulty: questions.difficulty,
+      question_text: questions.questionText,
+      default_marks: questions.defaultMarks,
+    })
+    .from(questions)
+    .where(eq(questions.createdBy, profile.id));
 
-  // Query batches assigned to this teacher
-  const { data: batches } = await supabase
-    .from("batch_teachers")
-    .select("batch_id, batches!inner(id, name, target_exam)")
-    .eq("teacher_id", profile.id);
-
-  const formattedBatches = batches?.map((b: any) => ({
-    id: b.batches.id,
-    name: b.batches.name,
-    target_exam: b.batches.target_exam,
-  })) || [];
-
-  // Query questions available
-  const { data: questions } = await supabase
-    .from("questions")
-    .select("id, topic, difficulty, question_text, default_marks")
-    .order("created_at", { ascending: false });
+  const batchesList = await db
+    .select({
+      id: batches.id,
+      name: batches.name,
+      academic_year: batches.academicYear,
+    })
+    .from(batches);
 
   return (
     <DashboardLayout profile={profile} navItems={teacherNavItems} roleTitle="Teacher Portal">
@@ -64,14 +54,16 @@ export default async function TeacherExamCreatePage() {
             Create Examination
           </h1>
           <p className="text-xs text-slate-500">
-            Configure test blueprints, select question sets, and assign to target batches.
+            Configure examination parameters, select questions from the bank, and assign to cohorts.
           </p>
         </div>
 
-        <ExamBuilderForm
-          batches={formattedBatches}
-          availableQuestions={questions || []}
-        />
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <ExamBuilderForm
+            availableQuestions={questionsList as any}
+            batches={batchesList as any}
+          />
+        </div>
       </div>
     </DashboardLayout>
   );

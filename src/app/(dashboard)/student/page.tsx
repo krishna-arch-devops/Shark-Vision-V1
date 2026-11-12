@@ -3,30 +3,18 @@ import { getCurrentProfile } from "@/lib/auth/session";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  LayoutDashboard,
-  FileSpreadsheet,
-  Zap,
-  BarChart3,
-  Clock,
-  Shuffle,
-  TrendingUp,
-  BookmarkCheck,
-  User,
-  Target,
-  CheckCircle,
-} from "lucide-react";
+import { Target, CheckCircle, Clock, Zap } from "lucide-react";
 
 const studentNavItems: NavItem[] = [
-  { label: "Overview", href: "/student", icon: LayoutDashboard },
-  { label: "My Examinations", href: "/student/examinations", icon: FileSpreadsheet },
-  { label: "Practice", href: "/student/practice", icon: Zap },
-  { label: "Performance", href: "/student/performance", icon: BarChart3 },
-  { label: "Time Intelligence", href: "/student/time-intelligence", icon: Clock },
-  { label: "Answer Changes", href: "/student/answer-changes", icon: Shuffle },
-  { label: "Progress", href: "/student/progress", icon: TrendingUp },
-  { label: "Revision Plan", href: "/student/revision", icon: BookmarkCheck },
-  { label: "Profile", href: "/student/profile", icon: User },
+  { label: "Overview", href: "/student", iconName: "LayoutDashboard" },
+  { label: "My Examinations", href: "/student/examinations", iconName: "FileSpreadsheet" },
+  { label: "Practice", href: "/student/practice", iconName: "Zap" },
+  { label: "Performance", href: "/student/performance", iconName: "BarChart3" },
+  { label: "Time Intelligence", href: "/student/time-intelligence", iconName: "Clock" },
+  { label: "Answer Changes", href: "/student/answer-changes", iconName: "Shuffle" },
+  { label: "Progress", href: "/student/progress", iconName: "TrendingUp" },
+  { label: "Revision Plan", href: "/student/revision", iconName: "BookmarkCheck" },
+  { label: "Profile", href: "/student/profile", iconName: "User" },
 ];
 
 export default async function StudentDashboardPage() {
@@ -48,81 +36,89 @@ export default async function StudentDashboardPage() {
             Welcome back, {profile.full_name}
           </h1>
           <p className="text-xs text-slate-500">
-            Targeting excellence in JEE / NEET examinations. Measure every second.
+            Monitor your exam readiness, active testing metrics, and behavioral intelligence.
           </p>
         </div>
 
-        {/* Highlight Metrics */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Top Metric Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Upcoming Tests</span>
-              <FileSpreadsheet className="h-4 w-4 text-sky-600" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              0
-            </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-slate-500">Active Target</CardTitle>
+              <Target className="h-4 w-4 text-sky-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">JEE Advanced</div>
+              <p className="text-[10px] text-slate-400 mt-1">Class 12 / Dropper Cohort</p>
+            </CardContent>
           </Card>
 
           <Card>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Tests Completed</span>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-slate-500">Examinations Taken</CardTitle>
               <CheckCircle className="h-4 w-4 text-emerald-600" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              0
-            </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">0</div>
+              <p className="text-[10px] text-slate-400 mt-1">Pending first mock exam</p>
+            </CardContent>
           </Card>
 
           <Card>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Average Accuracy</span>
-              <Target className="h-4 w-4 text-violet-600" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              --
-            </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-slate-500">Active Test Dwell</CardTitle>
+              <Clock className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">0h 0m</div>
+              <p className="text-[10px] text-slate-400 mt-1">Total active problem time</p>
+            </CardContent>
           </Card>
 
           <Card>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Time / Question</span>
-              <Clock className="h-4 w-4 text-amber-500" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              --
-            </div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-slate-500">Readiness Score</CardTitle>
+              <Zap className="h-4 w-4 text-indigo-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">N/A</div>
+              <p className="text-[10px] text-slate-400 mt-1">Requires 1 complete examination</p>
+            </CardContent>
           </Card>
         </div>
 
-        {/* Real Dynamic Sections */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Active Assignments */}
-          <Card>
+        {/* Main Content Area */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="col-span-1">
             <CardHeader>
-              <CardTitle>Assigned Examinations</CardTitle>
-              <CardDescription>Scheduled JEE & NEET mock tests and chapter assessments</CardDescription>
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Assigned Examinations
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Scheduled tests assigned by your instructors and coaching batches.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <EmptyState
-                icon={<FileSpreadsheet className="h-6 w-6 text-slate-400" />}
-                title="No Examinations Assigned Yet"
-                description="Your institution or teacher has not assigned tests to your batch yet. Check back soon."
+                title="No active assessments"
+                description="When your institution assigns an upcoming full-length mock or sectional test, it will appear here."
               />
             </CardContent>
           </Card>
 
-          {/* Performance Summary */}
-          <Card>
+          <Card className="col-span-1">
             <CardHeader>
-              <CardTitle>Performance Insights</CardTitle>
-              <CardDescription>Accuracy trends, time per difficulty level, and answer changes</CardDescription>
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Behavioral Trait Analytics
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Anti-guessing, answer change patterns, and speed-accuracy matrices.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <EmptyState
-                icon={<BarChart3 className="h-6 w-6 text-slate-400" />}
-                title="No Performance Data Yet"
-                description="Your performance insights, time intelligence graphs, and revision recommendations will appear after your first examination."
+                title="Telemetry waiting for data"
+                description="Complete an assigned assessment to unlock dwell time breakdown and rush-trap diagnostics."
               />
             </CardContent>
           </Card>

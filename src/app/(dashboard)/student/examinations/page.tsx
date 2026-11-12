@@ -1,36 +1,25 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  LayoutDashboard,
-  FileSpreadsheet,
-  Zap,
-  BarChart3,
-  Clock,
-  Shuffle,
-  TrendingUp,
-  BookmarkCheck,
-  User,
-  ArrowRight,
-  Play,
-} from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { EmptyState } from "@/components/ui/empty-state";
+import { db } from "@/lib/db";
+import { examinations, examinationAssignments, batchStudents } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import Link from "next/link";
+import { Clock, Award } from "lucide-react";
 
 const studentNavItems: NavItem[] = [
-  { label: "Overview", href: "/student", icon: LayoutDashboard },
-  { label: "My Examinations", href: "/student/examinations", icon: FileSpreadsheet },
-  { label: "Practice", href: "/student/practice", icon: Zap },
-  { label: "Performance", href: "/student/performance", icon: BarChart3 },
-  { label: "Time Intelligence", href: "/student/time-intelligence", icon: Clock },
-  { label: "Answer Changes", href: "/student/answer-changes", icon: Shuffle },
-  { label: "Progress", href: "/student/progress", icon: TrendingUp },
-  { label: "Revision Plan", href: "/student/revision", icon: BookmarkCheck },
-  { label: "Profile", href: "/student/profile", icon: User },
+  { label: "Overview", href: "/student", iconName: "LayoutDashboard" },
+  { label: "My Examinations", href: "/student/examinations", iconName: "FileSpreadsheet" },
+  { label: "Practice", href: "/student/practice", iconName: "Zap" },
+  { label: "Performance", href: "/student/performance", iconName: "BarChart3" },
+  { label: "Time Intelligence", href: "/student/time-intelligence", iconName: "Clock" },
+  { label: "Answer Changes", href: "/student/answer-changes", iconName: "Shuffle" },
+  { label: "Progress", href: "/student/progress", iconName: "TrendingUp" },
+  { label: "Revision Plan", href: "/student/revision", iconName: "BookmarkCheck" },
+  { label: "Profile", href: "/student/profile", iconName: "User" },
 ];
 
 export default async function StudentExaminationsPage() {
@@ -44,90 +33,79 @@ export default async function StudentExaminationsPage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
-
-  // Fetch examinations assigned to batches where student is enrolled
-  const { data: assignments } = await supabase
-    .from("examination_assignments")
-    .select(`
-      examination_id,
-      examinations!inner(
-        id,
-        title,
-        description,
-        category,
-        duration_minutes,
-        total_marks,
-        start_window,
-        end_window,
-        is_published
-      ),
-      batches!inner(
-        name,
-        batch_students!inner(student_id)
-      )
-    `)
-    .eq("batches.batch_students.student_id", profile.id)
-    .eq("examinations.is_published", true);
-
-  const assignedExams = assignments?.map((a: any) => a.examinations) || [];
+  const assignedExams = await db
+    .select({
+      id: examinations.id,
+      title: examinations.title,
+      description: examinations.description,
+      category: examinations.category,
+      durationMinutes: examinations.durationMinutes,
+      totalMarks: examinations.totalMarks,
+      startWindow: examinations.startWindow,
+      endWindow: examinations.endWindow,
+    })
+    .from(examinations)
+    .innerJoin(examinationAssignments, eq(examinations.id, examinationAssignments.examinationId))
+    .innerJoin(batchStudents, eq(examinationAssignments.batchId, batchStudents.batchId))
+    .where(eq(batchStudents.studentId, profile.id));
 
   return (
     <DashboardLayout profile={profile} navItems={studentNavItems} roleTitle="Student Portal">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">My Examinations</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Available Examinations
+          </h1>
           <p className="text-xs text-slate-500">
-            Active and scheduled JEE / NEET tests assigned to your batches.
+            Select an assessment to begin or resume your timed test.
           </p>
         </div>
 
-        {assignedExams.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {assignedExams.map((exam: any) => (
-              <Card key={exam.id} className="flex flex-col justify-between">
+        <div className="grid gap-4 md:grid-cols-2">
+          {assignedExams.length > 0 ? (
+            assignedExams.map((exam) => (
+              <Card key={exam.id} className="p-5 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="default">{exam.category}</Badge>
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      {exam.duration_minutes} Mins
+                  <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                    <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                      {exam.category}
                     </span>
+                    <span>Window: {new Date(exam.endWindow).toLocaleDateString()}</span>
                   </div>
-                  <h3 className="text-base font-bold text-slate-900 mb-1">{exam.title}</h3>
-                  <p className="text-xs text-slate-500 line-clamp-2 mb-4">
-                    {exam.description || "Comprehensive examination testing conceptual clarity."}
-                  </p>
+                  <h3 className="text-base font-semibold text-slate-900 mb-1">{exam.title}</h3>
+                  <p className="text-xs text-slate-500 line-clamp-2">{exam.description}</p>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-700">
-                    Marks: {exam.total_marks}
-                  </span>
-                  <Link href={`/student/examinations/${exam.id}/take`}>
-                    <Button size="sm">
-                      <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
-                      Take Test
-                    </Button>
+                <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+                  <div className="flex items-center space-x-4 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" /> {exam.durationMinutes} mins
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Award className="h-3.5 w-3.5" /> {exam.totalMarks} Marks
+                    </span>
+                  </div>
+
+                  <Link
+                    href={`/student/examinations/${exam.id}/take`}
+                    className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
+                  >
+                    Start Test
                   </Link>
                 </div>
               </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Assessments</CardTitle>
-              <CardDescription>Target examinations assigned by your institution teachers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EmptyState
-                icon={<FileSpreadsheet className="h-6 w-6 text-slate-400" />}
-                title="No Tests Available Right Now"
-                description="Your institution instructors have not deployed active assessments to your batch yet. Check back soon."
-              />
-            </CardContent>
-          </Card>
-        )}
+            ))
+          ) : (
+            <Card className="col-span-2">
+              <CardContent className="pt-6">
+                <EmptyState
+                  title="No examinations assigned"
+                  description="When instructors publish tests for your cohort, they will appear here."
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -7,9 +7,25 @@ import {
   Menu,
   X,
   LogOut,
-  User as UserIcon,
   ChevronRight,
   ShieldCheck,
+  LayoutDashboard,
+  FileSpreadsheet,
+  Zap,
+  BarChart3,
+  Clock,
+  Shuffle,
+  TrendingUp,
+  BookmarkCheck,
+  User,
+  Users,
+  Building2,
+  FileQuestion,
+  CreditCard,
+  Settings,
+  HelpCircle,
+  Award,
+  BookOpen,
 } from "lucide-react";
 import { Profile } from "@/types/database";
 import { logoutAction } from "@/lib/auth/actions";
@@ -18,7 +34,8 @@ import { cn } from "@/lib/utils/cn";
 export interface NavItem {
   label: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  iconName?: string;
+  icon?: React.ComponentType<{ className?: string }>;
   badge?: string;
 }
 
@@ -28,6 +45,38 @@ export interface DashboardLayoutProps {
   roleTitle: string;
   roleBadgeColor?: "default" | "success" | "warning" | "danger";
   children: React.ReactNode;
+}
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  LayoutDashboard,
+  FileSpreadsheet,
+  Zap,
+  BarChart3,
+  Clock,
+  Shuffle,
+  TrendingUp,
+  BookmarkCheck,
+  User,
+  Users,
+  Building2,
+  FileQuestion,
+  CreditCard,
+  Settings,
+  HelpCircle,
+  Award,
+  BookOpen,
+};
+
+function renderItemIcon(item: NavItem, className: string) {
+  if (item.iconName && ICON_MAP[item.iconName]) {
+    const Component = ICON_MAP[item.iconName];
+    return <Component className={className} />;
+  }
+  if (typeof item.icon === "function" || (item.icon && typeof item.icon === "object")) {
+    const Component = item.icon;
+    return <Component className={className} />;
+  }
+  return <LayoutDashboard className={className} />;
 }
 
 export function DashboardLayout({
@@ -49,23 +98,19 @@ export function DashboardLayout({
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-600 text-white font-black text-sm shadow-sm">
               SV
             </div>
-            <div className="flex flex-col">
-              <span className="text-base font-bold tracking-tight text-slate-900 leading-none">
-                SHARKVISION
-              </span>
-              <span className="text-[10px] font-semibold text-sky-600 tracking-wider uppercase mt-0.5">
-                {roleTitle}
+            <div>
+              <span className="font-bold tracking-tight text-slate-900 text-sm">SHARKVISION</span>
+              <span className="block text-[9px] uppercase tracking-wider font-semibold text-slate-400">
+                Performance Intelligence
               </span>
             </div>
           </Link>
         </div>
 
-        {/* Navigation Items */}
+        {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
           {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== "/admin" && item.href !== "/teacher" && item.href !== "/parent" && item.href !== "/student" && pathname.startsWith(item.href));
-
+            const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
@@ -78,7 +123,7 @@ export function DashboardLayout({
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={cn("h-4 w-4", isActive ? "text-sky-600" : "text-slate-400")} />
+                  {renderItemIcon(item, cn("h-4 w-4", isActive ? "text-sky-600" : "text-slate-400"))}
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (
@@ -138,63 +183,64 @@ export function DashboardLayout({
 
           {/* Right Header Status */}
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 border border-slate-200">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Role: {profile.role}</span>
+            <div className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+              <ShieldCheck className="h-3.5 w-3.5 text-sky-600" />
+              <span>{roleTitle}</span>
             </div>
-            <Link
-              href="/profile"
-              className="flex items-center gap-2 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 transition"
-              title="Profile Settings"
-            >
-              <UserIcon className="h-4 w-4" />
-            </Link>
           </div>
         </header>
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="border-b border-slate-200 bg-white px-4 py-4 lg:hidden">
-            <nav className="space-y-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
-                      isActive
-                        ? "bg-sky-50 text-sky-700 font-semibold"
-                        : "text-slate-600 hover:bg-slate-50"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-              <div className="pt-4 border-t border-slate-100">
-                <form action={logoutAction}>
-                  <button
-                    type="submit"
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                    <span>Sign out</span>
-                  </button>
-                </form>
+          <div className="lg:hidden fixed inset-0 z-50 flex">
+            <div
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white pt-5 pb-4">
+              <div className="flex items-center justify-between px-4 pb-4 border-b border-slate-100">
+                <span className="font-bold text-slate-900">Navigation</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-            </nav>
+              <nav className="mt-4 flex-1 space-y-1 px-2">
+                {navItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium",
+                        isActive
+                          ? "bg-sky-50 text-sky-700 font-semibold"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        {renderItemIcon(item, cn("h-4 w-4", isActive ? "text-sky-600" : "text-slate-400"))}
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge && (
+                        <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-800">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
           </div>
         )}
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl">{children}</div>
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

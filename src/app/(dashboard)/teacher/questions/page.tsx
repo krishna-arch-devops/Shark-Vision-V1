@@ -1,28 +1,22 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
-import { QuestionAuthoringForm } from "@/components/exam/question-authoring-form";
-import {
-  LayoutDashboard,
-  Users2,
-  GraduationCap,
-  HelpCircle,
-  FilePlus,
-  FileSpreadsheet,
-  BarChart3,
-  BookOpenCheck,
-} from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { db } from "@/lib/db";
+import { questions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 
 const teacherNavItems: NavItem[] = [
-  { label: "Overview", href: "/teacher", icon: LayoutDashboard },
-  { label: "My Batches", href: "/teacher/batches", icon: Users2 },
-  { label: "My Students", href: "/teacher/students", icon: GraduationCap },
-  { label: "Question Bank", href: "/teacher/questions", icon: HelpCircle },
-  { label: "Create Examination", href: "/teacher/examinations/create", icon: FilePlus },
-  { label: "Examinations", href: "/teacher/examinations", icon: FileSpreadsheet },
-  { label: "Performance Analytics", href: "/teacher/analytics", icon: BarChart3 },
-  { label: "Assignments", href: "/teacher/assignments", icon: BookOpenCheck },
+  { label: "Overview", href: "/teacher", iconName: "LayoutDashboard" },
+  { label: "Batches", href: "/teacher/batches", iconName: "Users" },
+  { label: "Question Bank", href: "/teacher/questions", iconName: "FileQuestion" },
+  { label: "Examinations", href: "/teacher/examinations", iconName: "FileSpreadsheet" },
+  { label: "Assignments", href: "/teacher/assignments", iconName: "BookmarkCheck" },
+  { label: "Cohort Analytics", href: "/teacher/analytics", iconName: "BarChart3" },
+  { label: "Students", href: "/teacher/students", iconName: "User" },
 ];
 
 export default async function TeacherQuestionsPage() {
@@ -36,29 +30,55 @@ export default async function TeacherQuestionsPage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
-  const { data: subjects } = await supabase.from("subjects").select("id, name, code");
-
-  const fallbackSubjects = [
-    { id: "11111111-1111-1111-1111-111111111111", name: "Physics", code: "PHY" },
-    { id: "22222222-2222-2222-2222-222222222222", name: "Chemistry", code: "CHE" },
-    { id: "33333333-3333-3333-3333-333333333333", name: "Mathematics", code: "MAT" },
-    { id: "44444444-4444-4444-4444-444444444444", name: "Biology", code: "BIO" },
-  ];
+  const questionsList = await db
+    .select({
+      id: questions.id,
+      topic: questions.topic,
+      difficulty: questions.difficulty,
+      questionText: questions.questionText,
+      defaultMarks: questions.defaultMarks,
+      category: questions.category,
+    })
+    .from(questions)
+    .where(eq(questions.createdBy, profile.id))
+    .limit(50);
 
   return (
     <DashboardLayout profile={profile} navItems={teacherNavItems} roleTitle="Teacher Portal">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Question Bank Manager
-          </h1>
-          <p className="text-xs text-slate-500">
-            Author and publish JEE / NEET questions with difficulty tagging and options.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Question Bank
+            </h1>
+            <p className="text-xs text-slate-500">
+              Authored questions with full difficulty tagging and negative marking configuration.
+            </p>
+          </div>
         </div>
 
-        <QuestionAuthoringForm subjects={subjects && subjects.length > 0 ? subjects : fallbackSubjects} />
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="divide-y divide-slate-100">
+            {questionsList.length > 0 ? (
+              questionsList.map((q) => (
+                <div key={q.id} className="py-3">
+                  <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                    <span className="font-semibold text-slate-800">{q.category} • {q.topic}</span>
+                    <span className="rounded-sm bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+                      {q.difficulty}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-700 line-clamp-2">{q.questionText}</p>
+                </div>
+              ))
+            ) : (
+              <EmptyState
+                title="No questions authored yet"
+                description="Questions you create for your batch assignments will be listed here."
+              />
+            )}
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );

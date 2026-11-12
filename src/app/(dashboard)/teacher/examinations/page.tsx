@@ -1,33 +1,22 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth/session";
 import { DashboardLayout, NavItem } from "@/components/layout/dashboard-layout";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  LayoutDashboard,
-  Users2,
-  GraduationCap,
-  HelpCircle,
-  FilePlus,
-  FileSpreadsheet,
-  BarChart3,
-  BookOpenCheck,
-  Plus,
-} from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { examinations } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 
 const teacherNavItems: NavItem[] = [
-  { label: "Overview", href: "/teacher", icon: LayoutDashboard },
-  { label: "My Batches", href: "/teacher/batches", icon: Users2 },
-  { label: "My Students", href: "/teacher/students", icon: GraduationCap },
-  { label: "Question Bank", href: "/teacher/questions", icon: HelpCircle },
-  { label: "Create Examination", href: "/teacher/examinations/create", icon: FilePlus },
-  { label: "Examinations", href: "/teacher/examinations", icon: FileSpreadsheet },
-  { label: "Performance Analytics", href: "/teacher/analytics", icon: BarChart3 },
-  { label: "Assignments", href: "/teacher/assignments", icon: BookOpenCheck },
+  { label: "Overview", href: "/teacher", iconName: "LayoutDashboard" },
+  { label: "Batches", href: "/teacher/batches", iconName: "Users" },
+  { label: "Question Bank", href: "/teacher/questions", iconName: "FileQuestion" },
+  { label: "Examinations", href: "/teacher/examinations", iconName: "FileSpreadsheet" },
+  { label: "Assignments", href: "/teacher/assignments", iconName: "BookmarkCheck" },
+  { label: "Cohort Analytics", href: "/teacher/analytics", iconName: "BarChart3" },
+  { label: "Students", href: "/teacher/students", iconName: "User" },
 ];
 
 export default async function TeacherExaminationsPage() {
@@ -41,11 +30,10 @@ export default async function TeacherExaminationsPage() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
-  const { data: exams } = await supabase
-    .from("examinations")
-    .select("*, examination_attempts(count)")
-    .order("created_at", { ascending: false });
+  const examsList = await db
+    .select()
+    .from(examinations)
+    .where(eq(examinations.createdBy, profile.id));
 
   return (
     <DashboardLayout profile={profile} navItems={teacherNavItems} roleTitle="Teacher Portal">
@@ -53,68 +41,54 @@ export default async function TeacherExaminationsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Examinations Manager
+              Examination Management
             </h1>
             <p className="text-xs text-slate-500">
-              Active, scheduled, and past batch assessments.
+              Published assessments and batch assignments.
             </p>
           </div>
-          <Link href="/teacher/examinations/create">
-            <Button size="sm">
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              New Examination
-            </Button>
+
+          <Link
+            href="/teacher/examinations/create"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
+          >
+            <Plus className="h-4 w-4" /> Create Examination
           </Link>
         </div>
 
-        {exams && exams.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {exams.map((exam) => (
-              <Card key={exam.id} className="flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant={exam.is_published ? "success" : "outline"}>
-                      {exam.is_published ? "Published" : "Draft"}
-                    </Badge>
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      {exam.duration_minutes} Mins
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 mb-1">{exam.title}</h3>
-                  <p className="text-xs text-slate-500 line-clamp-2 mb-4">
-                    Category: {exam.category} • Total Marks: {exam.total_marks}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Policy: {exam.result_release_policy}</span>
-                  <span className="font-semibold text-slate-700">
-                    Attempts: {exam.examination_attempts?.[0]?.count || 0}
+        <div className="grid gap-4 md:grid-cols-2">
+          {examsList.length > 0 ? (
+            examsList.map((exam) => (
+              <div
+                key={exam.id}
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                    {exam.category}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {exam.isPublished ? "Published" : "Draft"}
                   </span>
                 </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Batch Examinations</CardTitle>
-              <CardDescription>Created tests deployed to student batches</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EmptyState
-                icon={<FileSpreadsheet className="h-6 w-6 text-slate-400" />}
-                title="No Examinations Created Yet"
-                description="Use the examination builder to configure test blueprints and select questions from the question bank."
-                action={
-                  <Link href="/teacher/examinations/create">
-                    <Button size="sm">Create First Examination</Button>
-                  </Link>
-                }
-              />
-            </CardContent>
-          </Card>
-        )}
+                <h3 className="text-base font-semibold text-slate-900">{exam.title}</h3>
+                <p className="text-xs text-slate-500 line-clamp-2">{exam.description}</p>
+                <div className="pt-2 text-xs text-slate-500">
+                  {exam.durationMinutes} minutes • {exam.totalMarks} Marks
+                </div>
+              </div>
+            ))
+          ) : (
+            <Card className="col-span-2">
+              <CardContent className="pt-6">
+                <EmptyState
+                  title="No examinations created yet"
+                  description="Click 'Create Examination' to author a test and assign it to your student cohorts."
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );
