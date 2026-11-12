@@ -1,44 +1,34 @@
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { attemptAnalyticsSnapshots } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { CompleteAttemptAnalytics } from "../types";
-import { AnalyticsCalculationInput } from "../domain/input-types";
-import { calculatePerformanceOverview } from "../calculators/performance-calculator";
-import { calculateTimeIntelligence } from "../calculators/time-calculator";
-import { calculateAnswerChangeIntelligence } from "../calculators/answer-change-calculator";
-import { calculateSpeedAccuracyMatrix } from "../calculators/speed-accuracy-calculator";
-import {
-  calculateSubjectAnalytics,
-  calculateTopicAnalytics,
-} from "../calculators/subject-topic-calculator";
-import { generateRecommendations } from "../recommendations/recommendation-engine";
-import { generateParentSummary } from "../services/parent-summary-service";
 
 export class AnalyticsRepository {
   /**
    * Fetches an existing analytics snapshot if present.
    */
   async getSnapshot(attemptId: string): Promise<CompleteAttemptAnalytics | null> {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("attempt_analytics_snapshots")
-      .select("*")
-      .eq("attempt_id", attemptId)
-      .single();
+    const [data] = await db
+      .select()
+      .from(attemptAnalyticsSnapshots)
+      .where(eq(attemptAnalyticsSnapshots.attemptId, attemptId))
+      .limit(1);
 
-    if (error || !data) return null;
+    if (!data) return null;
 
     return {
-      attemptId: data.attempt_id,
-      schemaVersion: data.schema_version,
-      calculatedAt: data.calculated_at,
-      measurementQuality: data.measurement_quality,
-      performanceOverview: data.performance_overview,
-      timeIntelligence: data.time_intelligence,
-      answerChangeIntelligence: data.answer_change_intelligence,
-      speedAccuracyMatrix: data.speed_accuracy_matrix,
-      subjectAnalytics: data.subject_analytics,
-      topicAnalytics: data.topic_analytics,
-      recommendations: data.recommendations,
-      parentSummary: data.parent_summary,
+      attemptId: data.attemptId,
+      schemaVersion: data.schemaVersion,
+      calculatedAt: data.calculatedAt ? data.calculatedAt.toISOString() : new Date().toISOString(),
+      measurementQuality: data.measurementQuality as any,
+      performanceOverview: data.performanceOverview as any,
+      timeIntelligence: data.timeIntelligence as any,
+      answerChangeIntelligence: data.answerChangeIntelligence as any,
+      speedAccuracyMatrix: data.speedAccuracyMatrix as any,
+      subjectAnalytics: data.subjectAnalytics as any,
+      topicAnalytics: data.topicAnalytics as any,
+      recommendations: data.recommendations as any,
+      parentSummary: data.parentSummary as any,
     };
   }
 
@@ -51,25 +41,39 @@ export class AnalyticsRepository {
     studentId: string,
     analytics: CompleteAttemptAnalytics
   ): Promise<void> {
-    const supabase = await createClient();
-    await supabase.from("attempt_analytics_snapshots").upsert(
-      {
-        attempt_id: attemptId,
-        examination_id: examinationId,
-        student_id: studentId,
-        schema_version: analytics.schemaVersion,
-        calculatedAt: analytics.calculatedAt,
-        measurement_quality: analytics.measurementQuality,
-        performance_overview: analytics.performanceOverview,
-        time_intelligence: analytics.timeIntelligence,
-        answer_change_intelligence: analytics.answerChangeIntelligence,
-        speed_accuracy_matrix: analytics.speedAccuracyMatrix,
-        subject_analytics: analytics.subjectAnalytics,
-        topic_analytics: analytics.topicAnalytics,
+    await db
+      .insert(attemptAnalyticsSnapshots)
+      .values({
+        attemptId,
+        examinationId,
+        studentId,
+        schemaVersion: analytics.schemaVersion,
+        calculatedAt: new Date(analytics.calculatedAt),
+        measurementQuality: analytics.measurementQuality,
+        performanceOverview: analytics.performanceOverview,
+        timeIntelligence: analytics.timeIntelligence,
+        answerChangeIntelligence: analytics.answerChangeIntelligence,
+        speedAccuracyMatrix: analytics.speedAccuracyMatrix,
+        subjectAnalytics: analytics.subjectAnalytics,
+        topicAnalytics: analytics.topicAnalytics,
         recommendations: analytics.recommendations,
-        parent_summary: analytics.parentSummary,
-      },
-      { onConflict: "attempt_id" }
-    );
+        parentSummary: analytics.parentSummary,
+      })
+      .onConflictDoUpdate({
+        target: attemptAnalyticsSnapshots.attemptId,
+        set: {
+          schemaVersion: analytics.schemaVersion,
+          calculatedAt: new Date(analytics.calculatedAt),
+          measurementQuality: analytics.measurementQuality,
+          performanceOverview: analytics.performanceOverview,
+          timeIntelligence: analytics.timeIntelligence,
+          answerChangeIntelligence: analytics.answerChangeIntelligence,
+          speedAccuracyMatrix: analytics.speedAccuracyMatrix,
+          subjectAnalytics: analytics.subjectAnalytics,
+          topicAnalytics: analytics.topicAnalytics,
+          recommendations: analytics.recommendations,
+          parentSummary: analytics.parentSummary,
+        },
+      });
   }
 }
